@@ -94,7 +94,6 @@
           elisa        # music player
           oxygen       # legacy theme, Plasma 6 uses Breeze
           khelpcenter  # offline help browser
-          dragonplayer # video player
           krdp         # remote desktop server
         ];
 
@@ -163,6 +162,7 @@
               enable = true;
               extensions = [
                 vscodeExtensions.vscode-marketplace.anthropic.claude-code
+                vscodeExtensions.vscode-marketplace.jnoortheen.nix-ide
               ];
             };
 
