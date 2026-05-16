@@ -20,16 +20,20 @@
       url = "github:nix-community/NUR";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    rust-overlay = {
+      url = "github:oxalica/rust-overlay";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
-  outputs = { self, nixpkgs, home-manager, nix-vscode-extensions, plasma-manager, nur }:
+  outputs = { self, nixpkgs, home-manager, nix-vscode-extensions, plasma-manager, nur, rust-overlay }:
   let
     pkgs = nixpkgs.legacyPackages.x86_64-linux;
     vscodeExtensions = nix-vscode-extensions.extensions.x86_64-linux;
 
     commonConfig = { config, pkgs, ... }: {
       nixpkgs.system = "x86_64-linux";
-      nixpkgs.overlays = [ nur.overlays.default ];
+      nixpkgs.overlays = [ nur.overlays.default rust-overlay.overlays.default ];
       nixpkgs.config.allowUnfree = true;
 
       boot.loader.systemd-boot.enable = true;
@@ -126,6 +130,9 @@
         wezterm
         colmena
         catppuccin-kde
+        (rust-bin.beta.latest.default.override {
+          extensions = [ "rust-src" "rust-analyzer" ];
+        })
       ];
 
       home-manager = {
