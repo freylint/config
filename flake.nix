@@ -7,19 +7,24 @@
       url = "github:nix-community/home-manager";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    nixops.url = "github:NixOS/nixops";
     disko = {
       url = "github:nix-community/disko";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
 
-  outputs = { self, nixpkgs, home-manager, nixops, disko }: {
-    nixopsConfigurations.default = {
-      inherit nixpkgs;
-      network.description = "nixos deployment";
+  outputs = { self, nixpkgs, home-manager, disko }: {
+    colmena = {
+      meta = {
+        nixpkgs = import nixpkgs { system = "x86_64-linux"; };
+      };
 
       nixos = { config, pkgs, ... }: {
+        deployment = {
+          allowLocalDeployment = true;
+          targetHost = null;
+        };
+
         imports = [
           ./hwconfig/${builtins.substring 0 8 (builtins.readFile "/etc/machine-id")}.nix
           ./mod/exclusions.nix
@@ -42,7 +47,7 @@
         # Use latest kernel.
         boot.kernelPackages = pkgs.linuxPackages_latest;
 
-        networking.hostName = builtins.substring 0 8 (builtins.readFile "/etc/machine-id");
+        networking.hostName = "nixos";
         networking.hostId = builtins.substring 0 8 (builtins.readFile "/etc/machine-id");
         networking.networkmanager.enable = true;
 
@@ -79,6 +84,13 @@
         # Required for zsh to be a valid login shell.
         programs.zsh.enable = true;
 
+        programs.ssh.askPassword = "${pkgs.kdePackages.ksshaskpass}/bin/ksshaskpass";
+
+        environment.sessionVariables = {
+          SSH_ASKPASS_REQUIRE = "prefer";
+          SUDO_ASKPASS = "${pkgs.kdePackages.ksshaskpass}/bin/ksshaskpass";
+        };
+
         # Define a user account.
         users.users.gen = {
           isNormalUser = true;
@@ -105,7 +117,7 @@
           gnumake
           firefox
           wezterm
-          nixops
+          colmena
         ];
 
         home-manager = {

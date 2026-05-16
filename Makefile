@@ -1,16 +1,10 @@
 .ONESHELL:
 
-NIXOPS := nix run github:NixOS/nixops --
+COLMENA := nix run nixpkgs#colmena --
 
-update: update-nixops hardware-configuration
+update: hardware-configuration
 	nix flake update
-	$(NIXOPS) deploy -d default
+	$(COLMENA) apply-local
 
 hardware-configuration:
 	nixos-generate-config --show-hardware-config > hwconfig/$$(head -c 8 /etc/machine-id).nix
-
-update-nixops:
-	nix flake update nixops
-
-create:
-	$(NIXOPS) create --flake .#default
