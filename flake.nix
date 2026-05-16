@@ -15,7 +15,7 @@
 
   outputs = { self, nixpkgs, home-manager, nix-vscode-extensions }:
   let
-    hostname = "glw.freyground.com";
+    hostname = "glw";
     pkgs = nixpkgs.legacyPackages.x86_64-linux;
     vscodeExtensions = nix-vscode-extensions.extensions.x86_64-linux;
   in {
