@@ -162,7 +162,7 @@
             programs.vscode = {
               enable = true;
               extensions = [
-                vscodeExtensions.vscode-marketplace.anthropics.claude-code
+                vscodeExtensions.vscode-marketplace.anthropic.claude-code
               ];
             };
 
