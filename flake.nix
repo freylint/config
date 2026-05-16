@@ -7,32 +7,29 @@
       url = "github:nix-community/home-manager";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    disko = {
-      url = "github:nix-community/disko";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
   };
 
-  outputs = { self, nixpkgs, home-manager, disko }: {
+  outputs = { self, nixpkgs, home-manager }:
+  let
+    hostname = "glw.freyground.com";
+    pkgs = nixpkgs.legacyPackages.x86_64-linux;
+  in {
+    packages.x86_64-linux.colmena = pkgs.colmena;
+
     colmena = {
       meta = {
         nixpkgs = import nixpkgs { system = "x86_64-linux"; };
       };
 
-      nixos = { config, pkgs, ... }: {
+      "${hostname}" = { config, pkgs, ... }: {
         deployment = {
           allowLocalDeployment = true;
           targetHost = null;
         };
 
         imports = [
-          ./hwconfig/${builtins.substring 0 8 (builtins.readFile "/etc/machine-id")}.nix
-          ./mod/exclusions.nix
-          ./mod/printing.nix
-          ./mod/sound.nix
-          ./mod/disko.nix
+          (./hwconfig + "/${hostname}.nix")
           home-manager.nixosModules.home-manager
-          disko.nixosModules.disko
         ];
 
         nixpkgs.system = "x86_64-linux";
@@ -41,14 +38,10 @@
         boot.loader.systemd-boot.enable = true;
         boot.loader.efi.canTouchEfiVariables = true;
 
-        boot.supportedFilesystems = [ "zfs" ];
-        boot.zfs.forceImportRoot = false;
-
         # Use latest kernel.
         boot.kernelPackages = pkgs.linuxPackages_latest;
 
-        networking.hostName = "nixos";
-        networking.hostId = builtins.substring 0 8 (builtins.readFile "/etc/machine-id");
+        networking.hostName = hostname;
         networking.networkmanager.enable = true;
 
         # Set your time zone.
@@ -79,6 +72,20 @@
         services.xserver.xkb = {
           layout = "us";
           variant = "";
+        };
+
+        services.xserver.excludePackages = [ pkgs.xterm ];
+        environment.plasma6.excludePackages = with pkgs.kdePackages; [ konsole ];
+
+        services.printing.enable = true;
+
+        services.pulseaudio.enable = false;
+        security.rtkit.enable = true;
+        services.pipewire = {
+          enable = true;
+          alsa.enable = true;
+          alsa.support32Bit = true;
+          pulse.enable = true;
         };
 
         # Required for zsh to be a valid login shell.
