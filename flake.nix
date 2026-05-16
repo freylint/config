@@ -41,7 +41,8 @@
         # Use latest kernel.
         boot.kernelPackages = pkgs.linuxPackages_latest;
 
-        networking.hostName = hostname;
+        networking.hostName = "glw";
+        networking.domain = "freyground.com";
         networking.networkmanager.enable = true;
 
         # Set your time zone.
