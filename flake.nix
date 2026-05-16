@@ -7,12 +7,17 @@
       url = "github:nix-community/home-manager";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    nix-vscode-extensions = {
+      url = "github:nix-community/nix-vscode-extensions";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
-  outputs = { self, nixpkgs, home-manager }:
+  outputs = { self, nixpkgs, home-manager, nix-vscode-extensions }:
   let
     hostname = "glw.freyground.com";
     pkgs = nixpkgs.legacyPackages.x86_64-linux;
+    vscodeExtensions = nix-vscode-extensions.extensions.x86_64-linux;
   in {
     packages.x86_64-linux.colmena = pkgs.colmena;
 
@@ -153,6 +158,13 @@
               [Basic Settings]
               Indexing-Enabled=false
             '';
+
+            programs.vscode = {
+              enable = true;
+              extensions = [
+                vscodeExtensions.vscode-marketplace.anthropics.claude-code
+              ];
+            };
 
             programs.wezterm = {
               enable = true;
