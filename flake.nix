@@ -30,7 +30,6 @@
   let
     pkgs = nixpkgs.legacyPackages.x86_64-linux;
     vscodeExtensions = nix-vscode-extensions.extensions.x86_64-linux;
-
     commonConfig = { config, pkgs, ... }: {
       nixpkgs.system = "x86_64-linux";
       nixpkgs.overlays = [ nur.overlays.default rust-overlay.overlays.default ];
@@ -85,6 +84,9 @@
         krdp
       ];
 
+      hardware.bluetooth.enable = true;
+      services.blueman.enable = true;
+
       services.printing.enable = true;
 
       services.pulseaudio.enable = false;
@@ -127,9 +129,16 @@
         git
         gh
         gnumake
+        gcc
+        kicad
+        openscad
+        yosys
         wezterm
         colmena
         catppuccin-kde
+        catppuccin-papirus-folders
+        discord
+        gnome-disk-utility
         (rust-bin.beta.latest.default.override {
           extensions = [ "rust-src" "rust-analyzer" ];
         })
@@ -148,6 +157,8 @@
             profiles.gen = {
               settings = {
                 "sidebar.verticalTabs" = true;
+"browser.newtabpage.activity-stream.feeds.section.topstories" = false;
+                "browser.newtabpage.activity-stream.showSponsored" = false;
               };
               extensions.packages = [
                 pkgs.nur.repos.rycee.firefox-addons.ublock-origin
@@ -190,6 +201,7 @@
           programs.plasma = {
             enable = true;
             workspace.colorScheme = "CatppuccinMochaMauve";
+            workspace.iconTheme = "Catppuccin-Mocha-Mauve-Papirus-Dark";
             workspace.splashScreen.theme = "None";
             workspace.wallpaperPictureOfTheDay.provider = "apod";
           };
@@ -205,12 +217,15 @@
               vscodeExtensions.vscode-marketplace.anthropic.claude-code
               vscodeExtensions.vscode-marketplace.jnoortheen.nix-ide
               vscodeExtensions.vscode-marketplace.catppuccin.catppuccin-vsc
+              vscodeExtensions.vscode-marketplace.mshr-h.veriloghdl
+              vscodeExtensions.vscode-marketplace.antyos.openscad
             ];
             userSettings = {
               "editor.fontFamily" = "'FiraCode Nerd Font', monospace";
               "editor.fontLigatures" = true;
               "terminal.integrated.fontFamily" = "'FiraCode Nerd Font'";
               "workbench.colorTheme" = "Catppuccin Mocha";
+              "extensions.ignoreRecommendations" = true;
             };
           };
 
@@ -279,5 +294,7 @@
         networking.hostName = "homebase";
       };
     };
+
+    formatter.x86_64-linux = pkgs.nixfmt-rfc-style;
   };
 }

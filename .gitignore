@@ -1,0 +1,14 @@
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# AI assistants
+.claude/
+.cursor/
+.aider*
+.copilot/
+
+# Rust
+target/
+Cargo.lock
