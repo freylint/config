@@ -24,9 +24,13 @@
       url = "github:oxalica/rust-overlay";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    nixos-vscode-server = {
+      url = "github:nix-community/nixos-vscode-server";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
-  outputs = { self, nixpkgs, home-manager, nix-vscode-extensions, plasma-manager, nur, rust-overlay }:
+  outputs = { self, nixpkgs, home-manager, nix-vscode-extensions, plasma-manager, nur, rust-overlay, nixos-vscode-server }:
   let
     pkgs = nixpkgs.legacyPackages.x86_64-linux;
     vscodeExtensions = nix-vscode-extensions.extensions.x86_64-linux;
@@ -139,6 +143,7 @@
         catppuccin-papirus-folders
         discord
         gnome-disk-utility
+        vkquake
         (rust-bin.beta.latest.default.override {
           extensions = [ "rust-src" "rust-analyzer" ];
         })
@@ -148,13 +153,15 @@
         useGlobalPkgs = true;
         useUserPackages = true;
         backupFileExtension = "backup";
-        sharedModules = [ plasma-manager.homeModules.plasma-manager ];
+        sharedModules = [ plasma-manager.homeModules.plasma-manager nixos-vscode-server.homeModules.default ];
         users.gen = { pkgs, ... }: {
           home.stateVersion = "25.11";
+          services.vscode-server.enable = true;
 
           programs.firefox = {
             enable = true;
             profiles.gen = {
+              search.default = "DuckDuckGo";
               settings = {
                 "sidebar.verticalTabs" = true;
 "browser.newtabpage.activity-stream.feeds.section.topstories" = false;
@@ -268,6 +275,10 @@
         nixpkgs = import nixpkgs { system = "x86_64-linux"; };
       };
 
+      defaults = { ... }: {
+        deployment.buildOnTarget = true;
+      };
+
       glw = { config, pkgs, ... }: {
         deployment = {
           allowLocalDeployment = true;
@@ -279,12 +290,15 @@
           commonConfig
         ];
         networking.hostName = "glw";
+        environment.systemPackages = [ pkgs.moonlight-qt ];
       };
 
       homebase = { config, pkgs, ... }: {
         deployment = {
           allowLocalDeployment = false;
-          targetHost = "homebase";
+          targetHost = "homebase.lan";
+          targetUser = "root";
+          buildOnTarget = true;
         };
         imports = [
           ./hwconfig/homebase.nix
@@ -292,6 +306,17 @@
           commonConfig
         ];
         networking.hostName = "homebase";
+        services.fwupd.enable = false;
+        services.sunshine = {
+          enable = true;
+          autoStart = true;
+          capSysAdmin = true;
+          openFirewall = true;
+        };
+        systemd.sleep.settings.Sleep = {
+          AllowSuspend = false;
+          AllowHibernation = false;
+        };
       };
     };
 
