@@ -10,3 +10,5 @@ done
 printf 'GPU:%s\n' "${gpu:---}"
 
 awk '$3=="nvme0n1"||$3=="sda"||$3=="vda"||$3=="hda"{printf "DSK:%s %s\n",$6,$10;exit}' /proc/diskstats
+
+awk 'NR>2 && $1!~/^(lo:|docker|br-|veth|virbr)/{gsub(/:/,"",$1); printf "NET:%s %s\n",$2,$10; exit}' /proc/net/dev

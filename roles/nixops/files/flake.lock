@@ -140,11 +140,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1779557940,
-        "narHash": "sha256-jO9hENOayABpVCqVImZ5u2OH7EKc2B+Cvrv7fvK3xqc=",
+        "lastModified": 1779565654,
+        "narHash": "sha256-yf2/RMk2xF+p1IENFo2fb0cw6NO6e1hF1lvFrX+apyE=",
         "owner": "nix-community",
         "repo": "NUR",
-        "rev": "4a1b78c25e3be6c3053722f6fa2cc2097761bcce",
+        "rev": "686d85f95ee094d69ebbbc645a57799b2d811a51",
         "type": "github"
       },
       "original": {
@@ -185,7 +185,8 @@
         "nixpkgs": "nixpkgs",
         "nur": "nur",
         "plasma-manager": "plasma-manager",
-        "rust-overlay": "rust-overlay"
+        "rust-overlay": "rust-overlay",
+        "users": "users"
       }
     },
     "rust-overlay": {
@@ -222,6 +223,25 @@
         "repo": "default",
         "type": "github"
       }
+    },
+    "users": {
+      "inputs": {
+        "nix-vscode-extensions": [
+          "nix-vscode-extensions"
+        ],
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "path": "./pkg/users",
+        "type": "path"
+      },
+      "original": {
+        "path": "./pkg/users",
+        "type": "path"
+      },
+      "parent": []
     }
   },
   "root": "root",

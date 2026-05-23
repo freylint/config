@@ -1,0 +1,13 @@
+---
+- hosts: localhost
+  gather_facts: true
+  vars:
+    target_hostname: "{{ ansible_hostname }}"
+
+  tasks:
+    - name: Apply NixOS configuration locally
+      ansible.builtin.command:
+        cmd: >
+          sudo env NIXPKGS_ALLOW_UNFREE=1
+          nix run .#colmena -- apply-local --impure --node {{ target_hostname }}
+        chdir: "{{ playbook_dir }}/../roles/nixops/files"

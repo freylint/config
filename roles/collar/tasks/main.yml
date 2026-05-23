@@ -1,0 +1,7 @@
+---
+- name: Build collar firmware
+  ansible.builtin.command:
+    cmd: nix build .#default
+    chdir: "{{ role_path }}/files"
+  delegate_to: localhost
+  run_once: true

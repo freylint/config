@@ -1,19 +1,19 @@
 .ONESHELL:
-.PHONY: update deploy hardware-configuration lock unlock
+.PHONY: update deploy apply-local collar lock unlock ss-dev copy-ssh-key
 
 TARGET_HOSTNAME ?= $(shell hostname)
 
-update: hardware-configuration
-	nix flake update
-	nix fmt .
-	sudo git config --global --add safe.directory $(CURDIR)
-	sudo NIXPKGS_ALLOW_UNFREE=1 nix run .#colmena -- apply-local --impure --node $(TARGET_HOSTNAME)
+update:
+	ansible-playbook playbooks/site.yml
 
 deploy:
-	NIXPKGS_ALLOW_UNFREE=1 nix run .#colmena -- apply --on $(TARGET_HOSTNAME) --impure
+	ansible-playbook playbooks/site.yml --limit $(TARGET_HOSTNAME)
 
-deploy-homebase:
-	NIXPKGS_ALLOW_UNFREE=1 nix run .#colmena -- apply --on homebase --impure
+apply-local:
+	ansible-playbook playbooks/apply-local.yml -e target_hostname=$(TARGET_HOSTNAME)
+
+collar:
+	ansible-playbook playbooks/collar.yml
 
 DISPLAY_SESSION := $(shell loginctl list-sessions --no-legend | awk '$$4 != "-" {print $$1}' | head -1)
 
@@ -23,13 +23,8 @@ lock:
 unlock:
 	loginctl unlock-session $(DISPLAY_SESSION)
 
+ss-dev:
+	make update; make unlock; sleep 5; make lock
+
 copy-ssh-key:
 	ssh-copy-id $(USER)@$(TARGET_HOSTNAME)
-
-fetch-hwconfig:
-	scp $(USER)@$(TARGET_HOSTNAME):/etc/nixos/hardware-configuration.nix hwconfig/$(TARGET_HOSTNAME).nix
-	git add hwconfig/$(TARGET_HOSTNAME).nix
-
-hardware-configuration:
-	nixos-generate-config --show-hardware-config > hwconfig/$(TARGET_HOSTNAME).nix
-	git add hwconfig/$(TARGET_HOSTNAME).nix
