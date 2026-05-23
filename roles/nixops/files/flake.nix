@@ -44,6 +44,7 @@
       self,
       nixpkgs,
       home-manager,
+      nix-vscode-extensions,
       plasma-manager,
       nur,
       rust-overlay,
