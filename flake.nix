@@ -226,6 +226,7 @@
               vscodeExtensions.vscode-marketplace.catppuccin.catppuccin-vsc
               vscodeExtensions.vscode-marketplace.mshr-h.veriloghdl
               vscodeExtensions.vscode-marketplace.antyos.openscad
+              vscodeExtensions.vscode-marketplace.ms-vscode-remote.remote-ssh
             ];
             userSettings = {
               "editor.fontFamily" = "'FiraCode Nerd Font', monospace";
@@ -316,6 +317,124 @@
         systemd.sleep.settings.Sleep = {
           AllowSuspend = false;
           AllowHibernation = false;
+        };
+
+        home-manager.users.gen = { pkgs, ... }: {
+          xdg.dataFile = {
+            "plasma/wallpapers/org.kde.fireplace/metadata.json".text = ''
+              {
+                "KPlugin": {
+                  "Id": "org.kde.fireplace",
+                  "Name": "Fireplace",
+                  "Description": "Animated cellular-automaton fireplace"
+                },
+                "X-Plasma-API-Minimum-Version": "6.0",
+                "KPackageStructure": "Plasma/Wallpaper"
+              }
+            '';
+
+            "plasma/wallpapers/org.kde.fireplace/contents/ui/main.qml".text = ''
+              import QtQuick 2.15
+
+              Item {
+                  id: root
+
+                  readonly property int cols: 80
+                  readonly property int rows: 45
+
+                  property var buf: []
+                  property var pal: []
+
+                  Component.onCompleted: {
+                      buf = new Array(cols * rows).fill(0);
+                      var p = [];
+                      for (var i = 0; i < 256; i++) {
+                          var r = 0, g = 0, b = 0;
+                          if (i < 85) {
+                              r = i * 3;
+                          } else if (i < 170) {
+                              r = 255;
+                              g = (i - 85) * 3;
+                          } else {
+                              r = 255; g = 255;
+                              b = (i - 170) * 3;
+                          }
+                          p.push("rgb(" + r + "," + g + "," + b + ")");
+                      }
+                      pal = p;
+                  }
+
+                  Timer {
+                      interval: 40
+                      running: true
+                      repeat: true
+                      onTriggered: {
+                          var buf = root.buf;
+                          var cols = root.cols;
+                          var rows = root.rows;
+                          if (buf.length === 0) return;
+
+                          for (var x = 0; x < cols; x++) {
+                              buf[(rows - 1) * cols + x] = 255;
+                          }
+
+                          for (var y = 0; y < rows - 1; y++) {
+                              for (var x = 0; x < cols; x++) {
+                                  var s = buf[(y + 1) * cols + ((x - 1 + cols) % cols)]
+                                        + buf[(y + 1) * cols + x]
+                                        + buf[(y + 1) * cols + ((x + 1) % cols)]
+                                        + buf[y * cols + x];
+                                  buf[y * cols + x] = Math.max(0.0, s * 0.25 - 0.8);
+                              }
+                          }
+
+                          canvas.requestPaint();
+                      }
+                  }
+
+                  Canvas {
+                      id: canvas
+                      anchors.fill: parent
+
+                      onPaint: {
+                          var ctx = getContext("2d");
+                          if (root.buf.length === 0 || root.pal.length === 0) return;
+                          var cols = root.cols;
+                          var rows = root.rows;
+                          var buf = root.buf;
+                          var pal = root.pal;
+                          var cw = width / cols;
+                          var ch = height / rows;
+
+                          for (var y = 0; y < rows; y++) {
+                              for (var x = 0; x < cols; x++) {
+                                  var v = Math.min(255, Math.max(0, Math.floor(buf[y * cols + x])));
+                                  ctx.fillStyle = pal[v];
+                                  ctx.fillRect(
+                                      Math.floor(x * cw),
+                                      Math.floor(y * ch),
+                                      Math.floor((x + 1) * cw) - Math.floor(x * cw) + 1,
+                                      Math.floor((y + 1) * ch) - Math.floor(y * ch) + 1
+                                  );
+                              }
+                          }
+                      }
+                  }
+              }
+            '';
+          };
+
+          programs.plasma.kscreenlocker = {
+            autoLock = true;
+            lockOnResume = false;
+          };
+
+          programs.plasma.configFile."kscreenlockerrc" = {
+            "Greeter"."WallpaperPlugin" = "org.kde.fireplace";
+            "Daemon"."Timeout" = "10";
+            # Large grace period so screensaver dismisses without password
+            "Daemon"."LockGrace" = "999999";
+          };
         };
       };
     };
