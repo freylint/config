@@ -185,8 +185,7 @@
         "nixpkgs": "nixpkgs",
         "nur": "nur",
         "plasma-manager": "plasma-manager",
-        "rust-overlay": "rust-overlay",
-        "users": "users"
+        "rust-overlay": "rust-overlay"
       }
     },
     "rust-overlay": {
@@ -223,25 +222,6 @@
         "repo": "default",
         "type": "github"
       }
-    },
-    "users": {
-      "inputs": {
-        "nix-vscode-extensions": [
-          "nix-vscode-extensions"
-        ],
-        "nixpkgs": [
-          "nixpkgs"
-        ]
-      },
-      "locked": {
-        "path": "./pkg/users",
-        "type": "path"
-      },
-      "original": {
-        "path": "./pkg/users",
-        "type": "path"
-      },
-      "parent": []
     }
   },
   "root": "root",

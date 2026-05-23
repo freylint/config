@@ -32,11 +32,6 @@
       url = "path:./pkg/fireplace-wallpaper";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    users = {
-      url = "path:./pkg/users";
-      inputs.nixpkgs.follows = "nixpkgs";
-      inputs.nix-vscode-extensions.follows = "nix-vscode-extensions";
-    };
   };
 
   outputs =
@@ -50,10 +45,171 @@
       rust-overlay,
       nixos-vscode-server,
       fireplace-wallpaper,
-      users,
     }:
     let
       pkgs = nixpkgs.legacyPackages.x86_64-linux;
+
+      mkUser = pkgs: name: {
+        isNormalUser = true;
+        description = name;
+        extraGroups = [
+          "networkmanager"
+          "wheel"
+        ];
+        shell = pkgs.zsh;
+        packages = with pkgs; [
+          kdePackages.kate
+        ];
+      };
+
+      homeConfig =
+        { config, pkgs, ... }:
+        {
+          home.stateVersion = "25.11";
+          services.vscode-server.enable = true;
+
+          programs.firefox = {
+            enable = true;
+            configPath = ".mozilla/firefox";
+            profiles.default = {
+              search.default = "ddg";
+              settings = {
+                "sidebar.verticalTabs" = true;
+                "browser.newtabpage.activity-stream.feeds.section.topstories" = false;
+                "browser.newtabpage.activity-stream.showSponsored" = false;
+              };
+              extensions.packages = [
+                pkgs.nur.repos.rycee.firefox-addons.ublock-origin
+                (pkgs.nur.repos.rycee.firefox-addons.buildFirefoxXpiAddon {
+                  pname = "dark-reader";
+                  version = "4.9.125";
+                  addonId = "addon@darkreader.org";
+                  url = "https://addons.mozilla.org/firefox/downloads/file/4783321/darkreader-4.9.125.xpi";
+                  sha256 = "0a5g7rkc0fgnp7fpwk37703yksbwh1csahgq22drpq3kr25s3a91";
+                  meta = { };
+                })
+                (pkgs.nur.repos.rycee.firefox-addons.buildFirefoxXpiAddon {
+                  pname = "sponsorblock";
+                  version = "6.1.5";
+                  addonId = "sponsorBlocker@ajay.app";
+                  url = "https://addons.mozilla.org/firefox/downloads/file/4773757/sponsorblock-6.1.5.xpi";
+                  sha256 = "051f3gypy72m4irhyk62fkw5bdwid14kdm46g8q8xdxhxjd25v6q";
+                  meta = { };
+                })
+                (pkgs.nur.repos.rycee.firefox-addons.buildFirefoxXpiAddon {
+                  pname = "bitwarden";
+                  version = "2026.4.0";
+                  addonId = "{446900e4-71c2-419f-a6a7-df9c091e268b}";
+                  url = "https://addons.mozilla.org/firefox/downloads/file/4796063/bitwarden_password_manager-2026.4.0.xpi";
+                  sha256 = "045ffhr158lnafwdpyijhwnzzjf42rgwzpwvzva5b1hwl71zdgfc";
+                  meta = { };
+                })
+                (pkgs.nur.repos.rycee.firefox-addons.buildFirefoxXpiAddon {
+                  pname = "catppuccin-mocha-mauve";
+                  version = "old";
+                  addonId = "{76aabc99-c1a8-4c1e-832b-d4f2941d5a7a}";
+                  url = "https://github.com/catppuccin/firefox/releases/download/old/catppuccin_mocha_mauve.xpi";
+                  sha256 = "1gkv12034d2dbbvr2fmxbqifmgmfv0lh58my1gmkcvfpxrap6ad5";
+                  meta = { };
+                })
+              ];
+            };
+          };
+
+          programs.plasma = {
+            enable = true;
+            workspace.colorScheme = "CatppuccinMochaMauve";
+            workspace.iconTheme = "Papirus-Dark";
+            workspace.splashScreen.theme = "None";
+            workspace.wallpaperPictureOfTheDay.provider = "apod";
+          };
+
+          gtk = {
+            enable = true;
+            theme = {
+              name = "Catppuccin-Mocha-Standard-Mauve-Dark";
+              package = pkgs.catppuccin-gtk.override {
+                accents = [ "mauve" ];
+                size = "standard";
+                variant = "mocha";
+              };
+            };
+            gtk4.theme = config.gtk.theme;
+            iconTheme = {
+              name = "Papirus-Dark";
+              package = pkgs.papirus-icon-theme;
+            };
+          };
+
+          xdg.desktopEntries.vkquake = {
+            name = "vkQuake";
+            comment = "Vulkan Quake port based on QuakeSpasm";
+            exec = "vkquake -basedir /home/gen/Games/Heroic/Quake";
+            icon = "vkquake";
+            categories = [ "Game" ];
+          };
+
+          xdg.configFile."baloofilerc".text = ''
+            [Basic Settings]
+            Indexing-Enabled=false
+          '';
+
+          programs.vscode = {
+            enable = true;
+            profiles.default = {
+              extensions =
+                (with pkgs.vscode-extensions; [
+                  anthropic.claude-code
+                  jnoortheen.nix-ide
+                  catppuccin.catppuccin-vsc
+                  mshr-h.veriloghdl
+                  antyos.openscad
+                  ms-vscode-remote.remote-ssh
+                ])
+                ++ (with nix-vscode-extensions.extensions.x86_64-linux.vscode-marketplace; [
+                  slevesque.shader
+                  timgjones.hlsltools
+                  raczzalan.webgl-glsl-editor
+                ]);
+              userSettings = {
+                "editor.fontFamily" = "'FiraCode Nerd Font', monospace";
+                "editor.fontLigatures" = true;
+                "terminal.integrated.fontFamily" = "'FiraCode Nerd Font'";
+                "workbench.colorTheme" = "Catppuccin Mocha";
+                "extensions.ignoreRecommendations" = true;
+                "git.autofetch" = true;
+              };
+            };
+          };
+
+          programs.wezterm = {
+            enable = true;
+            extraConfig = ''
+              local wezterm = require("wezterm")
+              return {
+                font = wezterm.font("FiraCode Nerd Font", { weight = "Regular" }),
+                font_size = 12.0,
+                harfbuzz_features = { "calt=1", "clig=1", "liga=1" },
+                color_scheme = "Catppuccin Mocha",
+              }
+            '';
+          };
+
+          programs.zsh = {
+            enable = true;
+            syntaxHighlighting.enable = true;
+            autosuggestion.enable = true;
+            oh-my-zsh = {
+              enable = true;
+              theme = "robbyrussell";
+              plugins = [ "git" ];
+            };
+            shellAliases = {
+              wanip = "curl -s ifconfig.me && echo";
+            };
+          };
+        };
+
       commonConfig =
         { config, pkgs, ... }:
         {
@@ -61,6 +217,7 @@
           nixpkgs.overlays = [
             nur.overlays.default
             rust-overlay.overlays.default
+            nix-vscode-extensions.overlays.default
           ];
           nixpkgs.config.allowUnfree = true;
 
@@ -162,6 +319,7 @@
             discord
             heroic
             gnome-disk-utility
+            gparted
             vkquake
             (rust-bin.beta.latest.default.override {
               extensions = [
@@ -170,6 +328,9 @@
               ];
             })
           ];
+
+          users.users.gen = mkUser pkgs "gen";
+          users.users.bat = mkUser pkgs "bat";
 
           home-manager = {
             useGlobalPkgs = true;
@@ -180,6 +341,8 @@
               plasma-manager.homeModules.plasma-manager
               nixos-vscode-server.homeModules.default
             ];
+            users.gen = homeConfig;
+            users.bat = homeConfig;
           };
 
           nix.settings.experimental-features = [
@@ -194,9 +357,18 @@
     {
       packages.x86_64-linux.colmena = pkgs.colmena;
 
+      devShells.x86_64-linux.default = pkgs.mkShell {
+        packages = with pkgs; [
+          ansible
+          colmena
+          git
+          gnumake
+        ];
+      };
+
       colmena = {
         meta = {
-          nixpkgs = import nixpkgs { system = "x86_64-linux"; };
+          nixpkgs = import nixpkgs { system = "x86_64-linux"; config.allowUnfree = true; };
         };
 
         defaults =
@@ -216,10 +388,25 @@
               ./pkg/hwconfig/glw.nix
               home-manager.nixosModules.home-manager
               commonConfig
-              users.nixosModules.default
             ];
             networking.hostName = "glw";
             environment.systemPackages = [ pkgs.moonlight-qt ];
+          };
+
+        batpc =
+          { config, pkgs, ... }:
+          {
+            deployment = {
+              allowLocalDeployment = true;
+              targetHost = "batpc.lan";
+              targetUser = "root";
+            };
+            imports = [
+              ./pkg/hwconfig/batpc.nix
+              home-manager.nixosModules.home-manager
+              commonConfig
+            ];
+            networking.hostName = "batpc";
           };
 
         homebase =
@@ -233,7 +420,6 @@
               ./pkg/hwconfig/homebase.nix
               home-manager.nixosModules.home-manager
               commonConfig
-              users.nixosModules.default
               fireplace-wallpaper.nixosModules.default
             ];
             networking.hostName = "homebase";

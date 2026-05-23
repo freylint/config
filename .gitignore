@@ -10,5 +10,5 @@
 .copilot/
 
 # Rust
-target/
+**/target/
 Cargo.lock
