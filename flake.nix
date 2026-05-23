@@ -88,6 +88,8 @@
         krdp
       ];
 
+      services.openssh.enable = true;
+
       hardware.bluetooth.enable = true;
       services.blueman.enable = true;
 
@@ -142,6 +144,7 @@
         catppuccin-kde
         catppuccin-papirus-folders
         discord
+        heroic
         gnome-disk-utility
         vkquake
         (rust-bin.beta.latest.default.override {
@@ -164,7 +167,7 @@
               search.default = "DuckDuckGo";
               settings = {
                 "sidebar.verticalTabs" = true;
-"browser.newtabpage.activity-stream.feeds.section.topstories" = false;
+                "browser.newtabpage.activity-stream.feeds.section.topstories" = false;
                 "browser.newtabpage.activity-stream.showSponsored" = false;
               };
               extensions.packages = [
@@ -296,10 +299,8 @@
 
       homebase = { config, pkgs, ... }: {
         deployment = {
-          allowLocalDeployment = false;
-          targetHost = "homebase.lan";
-          targetUser = "root";
-          buildOnTarget = true;
+          allowLocalDeployment = true;
+          targetHost = null;
         };
         imports = [
           ./hwconfig/homebase.nix
