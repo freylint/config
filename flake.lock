@@ -1,5 +1,21 @@
 {
   "nodes": {
+    "fireplace-wallpaper": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "path": "./pkg/fireplace-wallpaper",
+        "type": "path"
+      },
+      "original": {
+        "path": "./pkg/fireplace-wallpaper",
+        "type": "path"
+      },
+      "parent": []
+    },
     "flake-parts": {
       "inputs": {
         "nixpkgs-lib": [
@@ -102,11 +118,11 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1779357205,
-        "narHash": "sha256-cCO8aTqss5x9Ky8GWkpY0Hy5fyTZEbtifSUV8QjSzic=",
+        "lastModified": 1779508470,
+        "narHash": "sha256-Ap9KJX+5xHIn3bPIpfNgT6MEXdAECECwo4/rmlQD74M=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "f83fc3c307e74bc5fd5adb7eb6b8b13ffd2a36e1",
+        "rev": "29916453413845e54a65b8a1cf996842300cd299",
         "type": "github"
       },
       "original": {
@@ -124,11 +140,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1779533926,
-        "narHash": "sha256-+0s3p4NRawaQm9g7LgtmVSKfmzj9rWIWvDjdlBeAHZM=",
+        "lastModified": 1779557940,
+        "narHash": "sha256-jO9hENOayABpVCqVImZ5u2OH7EKc2B+Cvrv7fvK3xqc=",
         "owner": "nix-community",
         "repo": "NUR",
-        "rev": "255647b232bfb564ce3ba4d1a79055d8a0d76be0",
+        "rev": "4a1b78c25e3be6c3053722f6fa2cc2097761bcce",
         "type": "github"
       },
       "original": {
@@ -162,6 +178,7 @@
     },
     "root": {
       "inputs": {
+        "fireplace-wallpaper": "fireplace-wallpaper",
         "home-manager": "home-manager",
         "nix-vscode-extensions": "nix-vscode-extensions",
         "nixos-vscode-server": "nixos-vscode-server",

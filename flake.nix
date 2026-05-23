@@ -28,418 +28,381 @@
       url = "github:nix-community/nixos-vscode-server";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    fireplace-wallpaper = {
+      url = "path:./pkg/fireplace-wallpaper";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
-  outputs = { self, nixpkgs, home-manager, nix-vscode-extensions, plasma-manager, nur, rust-overlay, nixos-vscode-server }:
-  let
-    pkgs = nixpkgs.legacyPackages.x86_64-linux;
-    vscodeExtensions = nix-vscode-extensions.extensions.x86_64-linux;
-    commonConfig = { config, pkgs, ... }: {
-      nixpkgs.system = "x86_64-linux";
-      nixpkgs.overlays = [ nur.overlays.default rust-overlay.overlays.default ];
-      nixpkgs.config.allowUnfree = true;
+  outputs =
+    {
+      self,
+      nixpkgs,
+      home-manager,
+      nix-vscode-extensions,
+      plasma-manager,
+      nur,
+      rust-overlay,
+      nixos-vscode-server,
+      fireplace-wallpaper,
+    }:
+    let
+      pkgs = nixpkgs.legacyPackages.x86_64-linux;
+      vscodeExtensions = nix-vscode-extensions.extensions.x86_64-linux;
+      commonConfig =
+        { config, pkgs, ... }:
+        {
+          nixpkgs.system = "x86_64-linux";
+          nixpkgs.overlays = [
+            nur.overlays.default
+            rust-overlay.overlays.default
+          ];
+          nixpkgs.config.allowUnfree = true;
 
-      boot.loader.systemd-boot.enable = true;
-      boot.loader.efi.canTouchEfiVariables = true;
-      boot.kernelPackages = pkgs.linuxPackages_latest;
+          boot.loader.systemd-boot.enable = true;
+          boot.loader.efi.canTouchEfiVariables = true;
+          boot.kernelPackages = pkgs.linuxPackages_latest;
 
-      networking.domain = "freyground.com";
-      networking.networkmanager.enable = true;
+          networking.domain = "freyground.com";
+          networking.networkmanager.enable = true;
 
-      time.timeZone = "America/New_York";
+          time.timeZone = "America/New_York";
 
-      i18n.defaultLocale = "en_US.UTF-8";
-      i18n.extraLocaleSettings = {
-        LC_ADDRESS = "en_US.UTF-8";
-        LC_IDENTIFICATION = "en_US.UTF-8";
-        LC_MEASUREMENT = "en_US.UTF-8";
-        LC_MONETARY = "en_US.UTF-8";
-        LC_NAME = "en_US.UTF-8";
-        LC_NUMERIC = "en_US.UTF-8";
-        LC_PAPER = "en_US.UTF-8";
-        LC_TELEPHONE = "en_US.UTF-8";
-        LC_TIME = "en_US.UTF-8";
-      };
+          i18n.defaultLocale = "en_US.UTF-8";
+          i18n.extraLocaleSettings = {
+            LC_ADDRESS = "en_US.UTF-8";
+            LC_IDENTIFICATION = "en_US.UTF-8";
+            LC_MEASUREMENT = "en_US.UTF-8";
+            LC_MONETARY = "en_US.UTF-8";
+            LC_NAME = "en_US.UTF-8";
+            LC_NUMERIC = "en_US.UTF-8";
+            LC_PAPER = "en_US.UTF-8";
+            LC_TELEPHONE = "en_US.UTF-8";
+            LC_TIME = "en_US.UTF-8";
+          };
 
-      services.xserver.enable = true;
+          services.xserver.enable = true;
 
-      services.displayManager.sddm = {
-        enable = true;
-        wayland.enable = true;
-        settings = {
-          General.Numlock = "on";
-          Theme.EnableAvatars = false;
-        };
-      };
-      services.displayManager.defaultSession = "plasma";
-      services.desktopManager.plasma6.enable = true;
-
-      services.xserver.xkb = {
-        layout = "us";
-        variant = "";
-      };
-
-      services.xserver.excludePackages = [ pkgs.xterm ];
-      environment.plasma6.excludePackages = with pkgs.kdePackages; [
-        konsole
-        elisa
-        oxygen
-        khelpcenter
-        krdp
-      ];
-
-      services.openssh.enable = true;
-
-      hardware.bluetooth.enable = true;
-      services.blueman.enable = true;
-
-      services.printing.enable = true;
-
-      services.pulseaudio.enable = false;
-      security.rtkit.enable = true;
-      services.pipewire = {
-        enable = true;
-        alsa.enable = true;
-        alsa.support32Bit = true;
-        pulse.enable = true;
-      };
-
-      programs.steam.enable = true;
-      programs.alvr.enable = true;
-      programs.zsh.enable = true;
-
-      programs.ssh.askPassword = "${pkgs.kdePackages.ksshaskpass}/bin/ksshaskpass";
-
-      environment.sessionVariables = {
-        SSH_ASKPASS_REQUIRE = "prefer";
-        SUDO_ASKPASS = "${pkgs.kdePackages.ksshaskpass}/bin/ksshaskpass";
-      };
-
-      users.users.gen = {
-        isNormalUser = true;
-        description = "gen";
-        extraGroups = [ "networkmanager" "wheel" ];
-        shell = pkgs.zsh;
-        packages = with pkgs; [
-          kdePackages.kate
-        ];
-      };
-
-      fonts.packages = with pkgs; [
-        nerd-fonts.fira-code
-      ];
-
-      environment.systemPackages = with pkgs; [
-        neovim
-        claude-code
-        git
-        gh
-        gnumake
-        gcc
-        kicad
-        openscad
-        yosys
-        wezterm
-        colmena
-        catppuccin-kde
-        catppuccin-papirus-folders
-        discord
-        heroic
-        gnome-disk-utility
-        vkquake
-        (rust-bin.beta.latest.default.override {
-          extensions = [ "rust-src" "rust-analyzer" ];
-        })
-      ];
-
-      home-manager = {
-        useGlobalPkgs = true;
-        useUserPackages = true;
-        backupFileExtension = "backup";
-        sharedModules = [ plasma-manager.homeModules.plasma-manager nixos-vscode-server.homeModules.default ];
-        users.gen = { pkgs, ... }: {
-          home.stateVersion = "25.11";
-          services.vscode-server.enable = true;
-
-          programs.firefox = {
+          services.displayManager.sddm = {
             enable = true;
-            profiles.gen = {
-              search.default = "DuckDuckGo";
-              settings = {
-                "sidebar.verticalTabs" = true;
-                "browser.newtabpage.activity-stream.feeds.section.topstories" = false;
-                "browser.newtabpage.activity-stream.showSponsored" = false;
-              };
-              extensions.packages = [
-                pkgs.nur.repos.rycee.firefox-addons.ublock-origin
-                (pkgs.nur.repos.rycee.firefox-addons.buildFirefoxXpiAddon {
-                  pname = "dark-reader";
-                  version = "4.9.125";
-                  addonId = "addon@darkreader.org";
-                  url = "https://addons.mozilla.org/firefox/downloads/file/4783321/darkreader-4.9.125.xpi";
-                  sha256 = "0a5g7rkc0fgnp7fpwk37703yksbwh1csahgq22drpq3kr25s3a91";
-                  meta = {};
-                })
-                (pkgs.nur.repos.rycee.firefox-addons.buildFirefoxXpiAddon {
-                  pname = "sponsorblock";
-                  version = "6.1.5";
-                  addonId = "sponsorBlocker@ajay.app";
-                  url = "https://addons.mozilla.org/firefox/downloads/file/4773757/sponsorblock-6.1.5.xpi";
-                  sha256 = "051f3gypy72m4irhyk62fkw5bdwid14kdm46g8q8xdxhxjd25v6q";
-                  meta = {};
-                })
-                (pkgs.nur.repos.rycee.firefox-addons.buildFirefoxXpiAddon {
-                  pname = "bitwarden";
-                  version = "2026.4.0";
-                  addonId = "{446900e4-71c2-419f-a6a7-df9c091e268b}";
-                  url = "https://addons.mozilla.org/firefox/downloads/file/4796063/bitwarden_password_manager-2026.4.0.xpi";
-                  sha256 = "045ffhr158lnafwdpyijhwnzzjf42rgwzpwvzva5b1hwl71zdgfc";
-                  meta = {};
-                })
-                (pkgs.nur.repos.rycee.firefox-addons.buildFirefoxXpiAddon {
-                  pname = "catppuccin-mocha-mauve";
-                  version = "old";
-                  addonId = "{76aabc99-c1a8-4c1e-832b-d4f2941d5a7a}";
-                  url = "https://github.com/catppuccin/firefox/releases/download/old/catppuccin_mocha_mauve.xpi";
-                  sha256 = "1gkv12034d2dbbvr2fmxbqifmgmfv0lh58my1gmkcvfpxrap6ad5";
-                  meta = {};
-                })
-              ];
+            wayland.enable = true;
+            settings = {
+              General.Numlock = "on";
+              Theme.EnableAvatars = false;
             };
           };
+          services.displayManager.defaultSession = "plasma";
+          services.desktopManager.plasma6.enable = true;
 
-          programs.plasma = {
-            enable = true;
-            workspace.colorScheme = "CatppuccinMochaMauve";
-            workspace.iconTheme = "Catppuccin-Mocha-Mauve-Papirus-Dark";
-            workspace.splashScreen.theme = "None";
-            workspace.wallpaperPictureOfTheDay.provider = "apod";
+          services.xserver.xkb = {
+            layout = "us";
+            variant = "";
           };
 
-          xdg.configFile."baloofilerc".text = ''
-            [Basic Settings]
-            Indexing-Enabled=false
-          '';
+          services.xserver.excludePackages = [ pkgs.xterm ];
+          environment.plasma6.excludePackages = with pkgs.kdePackages; [
+            konsole
+            elisa
+            oxygen
+            khelpcenter
+            krdp
+          ];
 
-          programs.vscode = {
+          services.openssh.enable = true;
+
+          hardware.bluetooth.enable = true;
+          services.blueman.enable = true;
+
+          services.printing.enable = true;
+
+          services.pulseaudio.enable = false;
+          security.rtkit.enable = true;
+          services.pipewire = {
             enable = true;
-            extensions = [
-              vscodeExtensions.vscode-marketplace.anthropic.claude-code
-              vscodeExtensions.vscode-marketplace.jnoortheen.nix-ide
-              vscodeExtensions.vscode-marketplace.catppuccin.catppuccin-vsc
-              vscodeExtensions.vscode-marketplace.mshr-h.veriloghdl
-              vscodeExtensions.vscode-marketplace.antyos.openscad
-              vscodeExtensions.vscode-marketplace.ms-vscode-remote.remote-ssh
+            alsa.enable = true;
+            alsa.support32Bit = true;
+            pulse.enable = true;
+          };
+
+          programs.steam.enable = true;
+          programs.alvr.enable = true;
+          programs.zsh.enable = true;
+
+          programs.ssh.askPassword = "${pkgs.kdePackages.ksshaskpass}/bin/ksshaskpass";
+
+          environment.sessionVariables = {
+            SSH_ASKPASS_REQUIRE = "prefer";
+            SUDO_ASKPASS = "${pkgs.kdePackages.ksshaskpass}/bin/ksshaskpass";
+          };
+
+          users.users.gen = {
+            isNormalUser = true;
+            description = "gen";
+            extraGroups = [
+              "networkmanager"
+              "wheel"
             ];
-            userSettings = {
-              "editor.fontFamily" = "'FiraCode Nerd Font', monospace";
-              "editor.fontLigatures" = true;
-              "terminal.integrated.fontFamily" = "'FiraCode Nerd Font'";
-              "workbench.colorTheme" = "Catppuccin Mocha";
-              "extensions.ignoreRecommendations" = true;
-            };
+            shell = pkgs.zsh;
+            packages = with pkgs; [
+              kdePackages.kate
+            ];
           };
 
-          programs.wezterm = {
-            enable = true;
-            extraConfig = ''
-              local wezterm = require("wezterm")
-              return {
-                font = wezterm.font("FiraCode Nerd Font", { weight = "Regular" }),
-                font_size = 12.0,
-                harfbuzz_features = { "calt=1", "clig=1", "liga=1" },
-                color_scheme = "Catppuccin Mocha",
-              }
-            '';
-          };
+          fonts.packages = with pkgs; [
+            nerd-fonts.fira-code
+          ];
 
-          programs.zsh = {
-            enable = true;
-            syntaxHighlighting.enable = true;
-            autosuggestion.enable = true;
-            oh-my-zsh = {
-              enable = true;
-              theme = "robbyrussell";
-              plugins = [ "git" ];
-            };
-          };
-        };
-      };
+          environment.systemPackages = with pkgs; [
+            neovim
+            claude-code
+            git
+            gh
+            gnumake
+            gcc
+            kicad
+            openscad
+            yosys
+            wezterm
+            colmena
+            catppuccin-kde
+            catppuccin-papirus-folders
+            discord
+            heroic
+            gnome-disk-utility
+            vkquake
+            (rust-bin.beta.latest.default.override {
+              extensions = [
+                "rust-src"
+                "rust-analyzer"
+              ];
+            })
+          ];
 
-      nix.settings.experimental-features = [ "nix-command" "flakes" ];
-
-      system.stateVersion = "25.11";
-    };
-
-  in {
-    packages.x86_64-linux.colmena = pkgs.colmena;
-
-    colmena = {
-      meta = {
-        nixpkgs = import nixpkgs { system = "x86_64-linux"; };
-      };
-
-      defaults = { ... }: {
-        deployment.buildOnTarget = true;
-      };
-
-      glw = { config, pkgs, ... }: {
-        deployment = {
-          allowLocalDeployment = true;
-          targetHost = null;
-        };
-        imports = [
-          ./hwconfig/glw.nix
-          home-manager.nixosModules.home-manager
-          commonConfig
-        ];
-        networking.hostName = "glw";
-        environment.systemPackages = [ pkgs.moonlight-qt ];
-      };
-
-      homebase = { config, pkgs, ... }: {
-        deployment = {
-          allowLocalDeployment = true;
-          targetHost = null;
-        };
-        imports = [
-          ./hwconfig/homebase.nix
-          home-manager.nixosModules.home-manager
-          commonConfig
-        ];
-        networking.hostName = "homebase";
-        services.fwupd.enable = false;
-        services.sunshine = {
-          enable = true;
-          autoStart = true;
-          capSysAdmin = true;
-          openFirewall = true;
-        };
-        systemd.sleep.settings.Sleep = {
-          AllowSuspend = false;
-          AllowHibernation = false;
-        };
-
-        home-manager.users.gen = { pkgs, ... }: {
-          xdg.dataFile = {
-            "plasma/wallpapers/org.kde.fireplace/metadata.json".text = ''
+          home-manager = {
+            useGlobalPkgs = true;
+            useUserPackages = true;
+            backupFileExtension = "backup";
+            backupCommand = "mv -f \"$1\" \"$1.backup\"";
+            sharedModules = [
+              plasma-manager.homeModules.plasma-manager
+              nixos-vscode-server.homeModules.default
+            ];
+            users.gen =
+              { pkgs, ... }:
               {
-                "KPlugin": {
-                  "Id": "org.kde.fireplace",
-                  "Name": "Fireplace",
-                  "Description": "Animated cellular-automaton fireplace"
-                },
-                "X-Plasma-API-Minimum-Version": "6.0",
-                "KPackageStructure": "Plasma/Wallpaper"
-              }
-            '';
+                home.stateVersion = "25.11";
+                services.vscode-server.enable = true;
 
-            "plasma/wallpapers/org.kde.fireplace/contents/ui/main.qml".text = ''
-              import QtQuick 2.15
+                programs.firefox = {
+                  enable = true;
+                  profiles.gen = {
+                    search.default = "DuckDuckGo";
+                    settings = {
+                      "sidebar.verticalTabs" = true;
+                      "browser.newtabpage.activity-stream.feeds.section.topstories" = false;
+                      "browser.newtabpage.activity-stream.showSponsored" = false;
+                    };
+                    extensions.packages = [
+                      pkgs.nur.repos.rycee.firefox-addons.ublock-origin
+                      (pkgs.nur.repos.rycee.firefox-addons.buildFirefoxXpiAddon {
+                        pname = "dark-reader";
+                        version = "4.9.125";
+                        addonId = "addon@darkreader.org";
+                        url = "https://addons.mozilla.org/firefox/downloads/file/4783321/darkreader-4.9.125.xpi";
+                        sha256 = "0a5g7rkc0fgnp7fpwk37703yksbwh1csahgq22drpq3kr25s3a91";
+                        meta = { };
+                      })
+                      (pkgs.nur.repos.rycee.firefox-addons.buildFirefoxXpiAddon {
+                        pname = "sponsorblock";
+                        version = "6.1.5";
+                        addonId = "sponsorBlocker@ajay.app";
+                        url = "https://addons.mozilla.org/firefox/downloads/file/4773757/sponsorblock-6.1.5.xpi";
+                        sha256 = "051f3gypy72m4irhyk62fkw5bdwid14kdm46g8q8xdxhxjd25v6q";
+                        meta = { };
+                      })
+                      (pkgs.nur.repos.rycee.firefox-addons.buildFirefoxXpiAddon {
+                        pname = "bitwarden";
+                        version = "2026.4.0";
+                        addonId = "{446900e4-71c2-419f-a6a7-df9c091e268b}";
+                        url = "https://addons.mozilla.org/firefox/downloads/file/4796063/bitwarden_password_manager-2026.4.0.xpi";
+                        sha256 = "045ffhr158lnafwdpyijhwnzzjf42rgwzpwvzva5b1hwl71zdgfc";
+                        meta = { };
+                      })
+                      (pkgs.nur.repos.rycee.firefox-addons.buildFirefoxXpiAddon {
+                        pname = "catppuccin-mocha-mauve";
+                        version = "old";
+                        addonId = "{76aabc99-c1a8-4c1e-832b-d4f2941d5a7a}";
+                        url = "https://github.com/catppuccin/firefox/releases/download/old/catppuccin_mocha_mauve.xpi";
+                        sha256 = "1gkv12034d2dbbvr2fmxbqifmgmfv0lh58my1gmkcvfpxrap6ad5";
+                        meta = { };
+                      })
+                    ];
+                  };
+                };
 
-              Item {
-                  id: root
+                programs.plasma = {
+                  enable = true;
+                  workspace.colorScheme = "CatppuccinMochaMauve";
+                  workspace.iconTheme = "Catppuccin-Mocha-Mauve-Papirus-Dark";
+                  workspace.splashScreen.theme = "None";
+                  workspace.wallpaperPictureOfTheDay.provider = "apod";
+                };
 
-                  readonly property int cols: 80
-                  readonly property int rows: 45
+                xdg.desktopEntries.vkquake = {
+                  name = "vkQuake";
+                  comment = "Vulkan Quake port based on QuakeSpasm";
+                  exec = "vkquake -basedir /home/gen/Games/Heroic/Quake";
+                  icon = "vkquake";
+                  categories = [ "Game" ];
+                };
 
-                  property var buf: []
-                  property var pal: []
+                xdg.configFile."baloofilerc".text = ''
+                  [Basic Settings]
+                  Indexing-Enabled=false
+                '';
 
-                  Component.onCompleted: {
-                      buf = new Array(cols * rows).fill(0);
-                      var p = [];
-                      for (var i = 0; i < 256; i++) {
-                          var r = 0, g = 0, b = 0;
-                          if (i < 85) {
-                              r = i * 3;
-                          } else if (i < 170) {
-                              r = 255;
-                              g = (i - 85) * 3;
-                          } else {
-                              r = 255; g = 255;
-                              b = (i - 170) * 3;
-                          }
-                          p.push("rgb(" + r + "," + g + "," + b + ")");
-                      }
-                      pal = p;
-                  }
+                programs.vscode = {
+                  enable = true;
+                  extensions = [
+                    vscodeExtensions.vscode-marketplace.anthropic.claude-code
+                    vscodeExtensions.vscode-marketplace.jnoortheen.nix-ide
+                    vscodeExtensions.vscode-marketplace.catppuccin.catppuccin-vsc
+                    vscodeExtensions.vscode-marketplace.mshr-h.veriloghdl
+                    vscodeExtensions.vscode-marketplace.antyos.openscad
+                    vscodeExtensions.vscode-marketplace.ms-vscode-remote.remote-ssh
+                    vscodeExtensions.vscode-marketplace.slevesque.shader
+                    vscodeExtensions.vscode-marketplace.timgjones.hlsltools
+                    vscodeExtensions.vscode-marketplace.raczzalan.webgl-glsl-editor
+                  ];
+                  userSettings = {
+                    "editor.fontFamily" = "'FiraCode Nerd Font', monospace";
+                    "editor.fontLigatures" = true;
+                    "terminal.integrated.fontFamily" = "'FiraCode Nerd Font'";
+                    "workbench.colorTheme" = "Catppuccin Mocha";
+                    "extensions.ignoreRecommendations" = true;
+                    "git.autofetch" = true;
+                  };
+                };
 
-                  Timer {
-                      interval: 40
-                      running: true
-                      repeat: true
-                      onTriggered: {
-                          var buf = root.buf;
-                          var cols = root.cols;
-                          var rows = root.rows;
-                          if (buf.length === 0) return;
+                programs.wezterm = {
+                  enable = true;
+                  extraConfig = ''
+                    local wezterm = require("wezterm")
+                    return {
+                      font = wezterm.font("FiraCode Nerd Font", { weight = "Regular" }),
+                      font_size = 12.0,
+                      harfbuzz_features = { "calt=1", "clig=1", "liga=1" },
+                      color_scheme = "Catppuccin Mocha",
+                    }
+                  '';
+                };
 
-                          for (var x = 0; x < cols; x++) {
-                              buf[(rows - 1) * cols + x] = 255;
-                          }
-
-                          for (var y = 0; y < rows - 1; y++) {
-                              for (var x = 0; x < cols; x++) {
-                                  var s = buf[(y + 1) * cols + ((x - 1 + cols) % cols)]
-                                        + buf[(y + 1) * cols + x]
-                                        + buf[(y + 1) * cols + ((x + 1) % cols)]
-                                        + buf[y * cols + x];
-                                  buf[y * cols + x] = Math.max(0.0, s * 0.25 - 0.8);
-                              }
-                          }
-
-                          canvas.requestPaint();
-                      }
-                  }
-
-                  Canvas {
-                      id: canvas
-                      anchors.fill: parent
-
-                      onPaint: {
-                          var ctx = getContext("2d");
-                          if (root.buf.length === 0 || root.pal.length === 0) return;
-                          var cols = root.cols;
-                          var rows = root.rows;
-                          var buf = root.buf;
-                          var pal = root.pal;
-                          var cw = width / cols;
-                          var ch = height / rows;
-
-                          for (var y = 0; y < rows; y++) {
-                              for (var x = 0; x < cols; x++) {
-                                  var v = Math.min(255, Math.max(0, Math.floor(buf[y * cols + x])));
-                                  ctx.fillStyle = pal[v];
-                                  ctx.fillRect(
-                                      Math.floor(x * cw),
-                                      Math.floor(y * ch),
-                                      Math.floor((x + 1) * cw) - Math.floor(x * cw) + 1,
-                                      Math.floor((y + 1) * ch) - Math.floor(y * ch) + 1
-                                  );
-                              }
-                          }
-                      }
-                  }
-              }
-            '';
+                programs.zsh = {
+                  enable = true;
+                  syntaxHighlighting.enable = true;
+                  autosuggestion.enable = true;
+                  oh-my-zsh = {
+                    enable = true;
+                    theme = "robbyrussell";
+                    plugins = [ "git" ];
+                  };
+                  shellAliases = {
+                    wanip = "curl -s ifconfig.me && echo";
+                  };
+                };
+              };
           };
 
-          programs.plasma.kscreenlocker = {
-            autoLock = true;
-            lockOnResume = false;
-          };
+          nix.settings.experimental-features = [
+            "nix-command"
+            "flakes"
+          ];
 
-          programs.plasma.configFile."kscreenlockerrc" = {
-            "Greeter"."WallpaperPlugin" = "org.kde.fireplace";
-            "Daemon"."Timeout" = "10";
-            # Large grace period so screensaver dismisses without password
-            "Daemon"."LockGrace" = "999999";
-          };
+          system.stateVersion = "25.11";
         };
-      };
-    };
 
-    formatter.x86_64-linux = pkgs.nixfmt-rfc-style;
-  };
+    in
+    {
+      packages.x86_64-linux.colmena = pkgs.colmena;
+
+      colmena = {
+        meta = {
+          nixpkgs = import nixpkgs { system = "x86_64-linux"; };
+        };
+
+        defaults =
+          { ... }:
+          {
+            deployment.buildOnTarget = true;
+          };
+
+        glw =
+          { config, pkgs, ... }:
+          {
+            deployment = {
+              allowLocalDeployment = true;
+              targetHost = null;
+            };
+            imports = [
+              ./hwconfig/glw.nix
+              home-manager.nixosModules.home-manager
+              commonConfig
+            ];
+            networking.hostName = "glw";
+            environment.systemPackages = [ pkgs.moonlight-qt ];
+          };
+
+        homebase =
+          { config, pkgs, ... }:
+          {
+            deployment = {
+              allowLocalDeployment = true;
+              targetHost = null;
+            };
+            imports = [
+              ./hwconfig/homebase.nix
+              home-manager.nixosModules.home-manager
+              commonConfig
+            ];
+            networking.hostName = "homebase";
+            services.fwupd.enable = false;
+            services.sunshine = {
+              enable = true;
+              autoStart = true;
+              capSysAdmin = true;
+              openFirewall = true;
+            };
+            systemd.sleep.settings.Sleep = {
+              AllowSuspend = false;
+              AllowHibernation = false;
+            };
+
+            environment.systemPackages = [ fireplace-wallpaper.packages.x86_64-linux.default ];
+
+            home-manager.users.gen =
+              { ... }:
+              {
+                programs.plasma.kscreenlocker = {
+                  autoLock = true;
+                  lockOnResume = false;
+                  appearance.alwaysShowClock = false;
+                };
+
+                programs.plasma.configFile."kscreenlockerrc" = {
+                  "Greeter"."WallpaperPlugin" = "io.lmpriestley.fireplace";
+                  "Daemon"."Timeout" = "10";
+                  # Large grace period so screensaver dismisses without password
+                  "Daemon"."LockGrace" = "999999";
+                };
+
+                programs.plasma.powerdevil.AC.turnOffDisplay = {
+                  idleTimeout = 600000;
+                  idleTimeoutWhenLocked = 600000;
+                };
+              };
+          };
+      };
+
+      formatter.x86_64-linux = pkgs.nixfmt-tree;
+    };
 }
