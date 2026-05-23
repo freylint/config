@@ -3,13 +3,10 @@
 
 TARGET_HOSTNAME ?= $(shell hostname)
 
-update:
+deploy:
 	ansible-playbook playbooks/site.yml
 
-deploy:
-	ansible-playbook playbooks/site.yml --limit $(TARGET_HOSTNAME)
-
-apply-local:
+deploy-local:
 	ansible-playbook playbooks/apply-local.yml -e target_hostname=$(TARGET_HOSTNAME)
 
 collar:
