@@ -47,7 +47,14 @@
       fireplace-wallpaper,
     }:
     let
-      pkgs = nixpkgs.legacyPackages.x86_64-linux;
+      system = "x86_64-linux";
+      pkgs = nixpkgs.legacyPackages.${system};
+      lib = nixpkgs.lib;
+
+      userNames = [
+        "gen"
+        "bat"
+      ];
 
       mkUser = pkgs: name: {
         isNormalUser = true;
@@ -64,6 +71,26 @@
 
       homeConfig =
         { config, pkgs, ... }:
+        let
+          mkFirefoxAddon =
+            {
+              pname,
+              version,
+              addonId,
+              url,
+              sha256,
+            }:
+            pkgs.nur.repos.rycee.firefox-addons.buildFirefoxXpiAddon {
+              inherit
+                pname
+                version
+                addonId
+                url
+                sha256
+                ;
+              meta = { };
+            };
+        in
         {
           home.stateVersion = "25.11";
           services.vscode-server.enable = true;
@@ -80,37 +107,33 @@
               };
               extensions.packages = [
                 pkgs.nur.repos.rycee.firefox-addons.ublock-origin
-                (pkgs.nur.repos.rycee.firefox-addons.buildFirefoxXpiAddon {
+                (mkFirefoxAddon {
                   pname = "dark-reader";
                   version = "4.9.125";
                   addonId = "addon@darkreader.org";
                   url = "https://addons.mozilla.org/firefox/downloads/file/4783321/darkreader-4.9.125.xpi";
                   sha256 = "0a5g7rkc0fgnp7fpwk37703yksbwh1csahgq22drpq3kr25s3a91";
-                  meta = { };
                 })
-                (pkgs.nur.repos.rycee.firefox-addons.buildFirefoxXpiAddon {
+                (mkFirefoxAddon {
                   pname = "sponsorblock";
                   version = "6.1.5";
                   addonId = "sponsorBlocker@ajay.app";
                   url = "https://addons.mozilla.org/firefox/downloads/file/4773757/sponsorblock-6.1.5.xpi";
                   sha256 = "051f3gypy72m4irhyk62fkw5bdwid14kdm46g8q8xdxhxjd25v6q";
-                  meta = { };
                 })
-                (pkgs.nur.repos.rycee.firefox-addons.buildFirefoxXpiAddon {
+                (mkFirefoxAddon {
                   pname = "bitwarden";
                   version = "2026.4.0";
                   addonId = "{446900e4-71c2-419f-a6a7-df9c091e268b}";
                   url = "https://addons.mozilla.org/firefox/downloads/file/4796063/bitwarden_password_manager-2026.4.0.xpi";
                   sha256 = "045ffhr158lnafwdpyijhwnzzjf42rgwzpwvzva5b1hwl71zdgfc";
-                  meta = { };
                 })
-                (pkgs.nur.repos.rycee.firefox-addons.buildFirefoxXpiAddon {
+                (mkFirefoxAddon {
                   pname = "catppuccin-mocha-mauve";
                   version = "old";
                   addonId = "{76aabc99-c1a8-4c1e-832b-d4f2941d5a7a}";
                   url = "https://github.com/catppuccin/firefox/releases/download/old/catppuccin_mocha_mauve.xpi";
                   sha256 = "1gkv12034d2dbbvr2fmxbqifmgmfv0lh58my1gmkcvfpxrap6ad5";
-                  meta = { };
                 })
               ];
             };
@@ -329,8 +352,7 @@
             })
           ];
 
-          users.users.gen = mkUser pkgs "gen";
-          users.users.bat = mkUser pkgs "bat";
+          users.users = lib.genAttrs userNames (name: mkUser pkgs name);
 
           home-manager = {
             useGlobalPkgs = true;
@@ -341,8 +363,7 @@
               plasma-manager.homeModules.plasma-manager
               nixos-vscode-server.homeModules.default
             ];
-            users.gen = homeConfig;
-            users.bat = homeConfig;
+            users = lib.genAttrs userNames (_: homeConfig);
           };
 
           nix.settings.experimental-features = [
@@ -353,11 +374,39 @@
           system.stateVersion = "25.11";
         };
 
+      # Build a colmena host node. `deployment` is passed through verbatim
+      # (so glw can keep targetHost = null without a targetUser). `extraModules`
+      # are appended to the standard imports; `extraConfig` is a module merged
+      # alongside the hostName.
+      mkHost =
+        {
+          name,
+          hwconfig,
+          deployment,
+          extraModules ? [ ],
+          extraConfig ? { },
+        }:
+        { ... }:
+        {
+          imports = [
+            hwconfig
+            home-manager.nixosModules.home-manager
+            commonConfig
+            extraConfig
+          ]
+          ++ extraModules;
+          networking.hostName = name;
+          deployment = {
+            allowLocalDeployment = true;
+          }
+          // deployment;
+        };
+
     in
     {
-      packages.x86_64-linux.colmena = pkgs.colmena;
+      packages.${system}.colmena = pkgs.colmena;
 
-      devShells.x86_64-linux.default = pkgs.mkShell {
+      devShells.${system}.default = pkgs.mkShell {
         packages = with pkgs; [
           ansible
           colmena
@@ -368,7 +417,10 @@
 
       colmena = {
         meta = {
-          nixpkgs = import nixpkgs { system = "x86_64-linux"; config.allowUnfree = true; };
+          nixpkgs = import nixpkgs {
+            inherit system;
+            config.allowUnfree = true;
+          };
         };
 
         defaults =
@@ -377,52 +429,35 @@
             deployment.buildOnTarget = true;
           };
 
-        glw =
-          { config, pkgs, ... }:
-          {
-            deployment = {
-              allowLocalDeployment = true;
-              targetHost = null;
+        glw = mkHost {
+          name = "glw";
+          hwconfig = ./pkg/hwconfig/glw.nix;
+          deployment.targetHost = null;
+          extraConfig =
+            { pkgs, ... }:
+            {
+              environment.systemPackages = [ pkgs.moonlight-qt ];
             };
-            imports = [
-              ./pkg/hwconfig/glw.nix
-              home-manager.nixosModules.home-manager
-              commonConfig
-            ];
-            networking.hostName = "glw";
-            environment.systemPackages = [ pkgs.moonlight-qt ];
-          };
+        };
 
-        batpc =
-          { config, pkgs, ... }:
-          {
-            deployment = {
-              allowLocalDeployment = true;
-              targetHost = "batpc.lan";
-              targetUser = "root";
-            };
-            imports = [
-              ./pkg/hwconfig/batpc.nix
-              home-manager.nixosModules.home-manager
-              commonConfig
-            ];
-            networking.hostName = "batpc";
+        batpc = mkHost {
+          name = "batpc";
+          hwconfig = ./pkg/hwconfig/batpc.nix;
+          deployment = {
+            targetHost = "batpc.lan";
+            targetUser = "root";
           };
+        };
 
-        homebase =
-          { config, pkgs, ... }:
-          {
-            deployment = {
-              allowLocalDeployment = true;
-              targetHost = null;
-            };
-            imports = [
-              ./pkg/hwconfig/homebase.nix
-              home-manager.nixosModules.home-manager
-              commonConfig
-              fireplace-wallpaper.nixosModules.default
-            ];
-            networking.hostName = "homebase";
+        homebase = mkHost {
+          name = "homebase";
+          hwconfig = ./pkg/hwconfig/homebase.nix;
+          deployment = {
+            targetHost = "homebase.lan";
+            targetUser = "root";
+          };
+          extraModules = [ fireplace-wallpaper.nixosModules.default ];
+          extraConfig = {
             services.fwupd.enable = false;
             services.sunshine = {
               enable = true;
@@ -457,8 +492,9 @@
                 };
               };
           };
+        };
       };
 
-      formatter.x86_64-linux = pkgs.nixfmt-tree;
+      formatter.${system} = pkgs.nixfmt-tree;
     };
 }

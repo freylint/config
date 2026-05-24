@@ -1,8 +1,4 @@
 ---
-- name: Wait for host to be reachable
-  ansible.builtin.wait_for_connection:
-    timeout: 30
-
 - name: Gather NixOS version
   ansible.builtin.command: nixos-version
   register: nixos_version
