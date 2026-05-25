@@ -1,9 +1,0 @@
----
-- name: Gather NixOS version
-  ansible.builtin.command: nixos-version
-  register: nixos_version
-  changed_when: false
-
-- name: Print NixOS version
-  ansible.builtin.debug:
-    msg: "{{ inventory_hostname }}: NixOS {{ nixos_version.stdout }}"

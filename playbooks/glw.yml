@@ -1,6 +1,0 @@
----
-- hosts: glw
-  gather_facts: false
-  roles:
-    - common
-    - nixops

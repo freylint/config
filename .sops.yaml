@@ -1,0 +1,46 @@
+keys:
+  # Admin keys — freylint SSH keys converted to age
+  - &admin1 age1slxeg5h3jfk7zhydjfwvehtqsqfxemask0wy3u7xcvz6kvvug5yq9a9myt
+  - &admin2 age1y62hzk6e00cljtv3swdxgnyfqlu5f4wcza9xv9t7qcyhr2xwefgs0mkqjk
+  - &admin3 age10ce999qkcppxkps99nk657z6609mgv6ed7nylel49pdykzamas8sjeccnq
+
+  # Host SSH keys converted to age (add batpc when reachable)
+  - &glw      age1henmeyknamm2y0wdzu650626hdnhzu9xesrfnhl3g9jyg8r5pchsch6wqm
+  - &homebase age1zlas86r94wnuwacrkf00fvj6mgztwg4mapvqqgza9xtltdz7zfpsfq3v62
+
+creation_rules:
+  # Secrets readable by all hosts and all admin keys
+  - path_regex: ^secrets/common/.*\.yaml$
+    key_groups:
+      - age:
+          - *admin1
+          - *admin2
+          - *admin3
+          - *glw
+          - *homebase
+
+  # Secrets for glw only
+  - path_regex: ^secrets/glw/.*\.yaml$
+    key_groups:
+      - age:
+          - *admin1
+          - *admin2
+          - *admin3
+          - *glw
+
+  # Secrets for homebase only
+  - path_regex: ^secrets/homebase/.*\.yaml$
+    key_groups:
+      - age:
+          - *admin1
+          - *admin2
+          - *admin3
+          - *homebase
+
+  # Secrets for batpc only (add &batpc key above when host is reachable)
+  - path_regex: ^secrets/batpc/.*\.yaml$
+    key_groups:
+      - age:
+          - *admin1
+          - *admin2
+          - *admin3

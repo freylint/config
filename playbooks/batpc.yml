@@ -1,6 +1,0 @@
----
-- hosts: batpc
-  gather_facts: false
-  roles:
-    - common
-    - nixops

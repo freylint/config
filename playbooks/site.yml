@@ -1,4 +1,0 @@
----
-- import_playbook: glw.yml
-- import_playbook: batpc.yml
-- import_playbook: homebase.yml

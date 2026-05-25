@@ -1,2 +1,0 @@
----
-nixos_config_dir: "{{ playbook_dir }}/../roles/nixops/files"

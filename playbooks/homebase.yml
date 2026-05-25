@@ -1,6 +1,0 @@
----
-- hosts: homebase
-  gather_facts: false
-  roles:
-    - common
-    - nixops
