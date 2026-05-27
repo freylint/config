@@ -1,0 +1,539 @@
+# Features:
+# - overlays: NUR, rust-overlay, nix-vscode-extensions overlays; unfree allowed
+# - desktop: KDE Plasma 6, SDDM Wayland, ksshaskpass, excluded KDE packages
+# - packages: system packages — dev, infra, eda, desktop groups
+# - wake_on_lan: WoL (magic packet) on all physical Ethernet interfaces at boot
+# - users: normal users with wheel/networkmanager groups and admin SSH keys
+# - firefox: DuckDuckGo, vertical tabs, uBlock Origin, Dark Reader, SponsorBlock, Bitwarden, Catppuccin
+# - gtk: Catppuccin Mocha Mauve GTK theme, Papirus-Dark icons
+# - home_sops: SOPS age key derived from SSH ed25519 key on activation
+# - vscode: extensions, FiraCode, Catppuccin Mocha, SOPS integration
+# - virtual_display: AMD virtual display connector for headless Wayland sessions
+# - home: home-manager module — Firefox, GTK, VS Code, plasma, WezTerm, Zsh, Baloo, games
+# - workstation: workstation role — all NixOS config + home-manager wiring
+let
+  overlays =
+    {
+      nur,
+      rust-overlay,
+      nix-vscode-extensions,
+      ...
+    }:
+    {
+      nixpkgs.overlays = [
+        nur.overlays.default
+        rust-overlay.overlays.default
+        nix-vscode-extensions.overlays.default
+      ];
+      nixpkgs.config.allowUnfree = true;
+    };
+
+  desktop =
+    { pkgs, ... }:
+    let
+      ksshaskpass = "${pkgs.kdePackages.ksshaskpass}/bin/ksshaskpass";
+    in
+    {
+      services = {
+        xserver = {
+          enable = true;
+          xkb = {
+            layout = "us";
+            variant = "";
+          };
+          excludePackages = [ pkgs.xterm ];
+        };
+        displayManager = {
+          sddm = {
+            enable = true;
+            wayland.enable = true;
+            settings = {
+              General.Numlock = "on";
+              Theme.EnableAvatars = false;
+            };
+          };
+          defaultSession = "plasma";
+        };
+        desktopManager.plasma6.enable = true;
+      };
+      environment = {
+        plasma6.excludePackages = with pkgs.kdePackages; [
+          konsole
+          elisa
+          oxygen
+          khelpcenter
+          krdp
+        ];
+        sessionVariables = {
+          SSH_ASKPASS_REQUIRE = "prefer";
+          SUDO_ASKPASS = ksshaskpass;
+        };
+      };
+      programs.ssh.askPassword = ksshaskpass;
+    };
+
+  packages =
+    { pkgs, ... }:
+    {
+      environment.systemPackages = with pkgs; [
+        # dev
+        python3
+        neovim
+        git
+        gh
+        gnumake
+        gcc
+        (rust-bin.beta.latest.default.override {
+          extensions = [
+            "rust-src"
+            "rust-analyzer"
+          ];
+        })
+        # infra
+        colmena
+        claude-code
+        jq
+        sops
+        age
+        ssh-to-age
+        # eda
+        kicad
+        openscad
+        yosys
+        # desktop
+        wezterm
+        discord
+        heroic
+        vkquake
+        catppuccin-kde
+        catppuccin-papirus-folders
+        gnome-disk-utility
+        gparted
+      ];
+    };
+
+  wake_on_lan =
+    { pkgs, ... }:
+    {
+      systemd.services.wake-on-lan = {
+        description = "Enable Wake-on-LAN on all ethernet interfaces";
+        wantedBy = [ "multi-user.target" ];
+        after = [ "network-pre.target" ];
+        wants = [ "network-pre.target" ];
+        serviceConfig = {
+          Type = "oneshot";
+          RemainAfterExit = true;
+          ExecStart = pkgs.writeShellScript "enable-wol" ''
+            for iface in $(ls /sys/class/net); do
+              # type=1 is Ethernet; skip virtual interfaces without a device dir
+              if [ -d "/sys/class/net/$iface/device" ] && \
+                 [ "$(cat /sys/class/net/$iface/type 2>/dev/null)" = "1" ]; then
+                ${pkgs.ethtool}/bin/ethtool -s "$iface" wol g || true
+              fi
+            done
+          '';
+        };
+      };
+    };
+
+  users =
+    {
+      lib,
+      pkgs,
+      adminKeys,
+      userNames,
+      ...
+    }:
+    let
+      mkUser = name: {
+        isNormalUser = true;
+        description = name;
+        extraGroups = [
+          "networkmanager"
+          "wheel"
+        ];
+        shell = pkgs.zsh;
+        openssh.authorizedKeys.keys = adminKeys;
+        packages = [ pkgs.kdePackages.kate ];
+      };
+    in
+    {
+      users.users = lib.genAttrs userNames mkUser // {
+        root.openssh.authorizedKeys.keys = adminKeys;
+      };
+    };
+
+  firefox =
+    { pkgs, ... }:
+    let
+      mkAddon =
+        attrs: pkgs.nur.repos.rycee.firefox-addons.buildFirefoxXpiAddon (attrs // { meta = { }; });
+    in
+    {
+      programs.firefox = {
+        enable = true;
+        configPath = ".mozilla/firefox";
+        profiles.default = {
+          search.default = "ddg";
+          settings = {
+            "sidebar.verticalTabs" = true;
+            "browser.newtabpage.activity-stream.feeds.section.topstories" = false;
+            "browser.newtabpage.activity-stream.showSponsored" = false;
+          };
+          extensions.packages = [
+            pkgs.nur.repos.rycee.firefox-addons.ublock-origin
+            (mkAddon {
+              pname = "dark-reader";
+              version = "4.9.125";
+              addonId = "addon@darkreader.org";
+              url = "https://addons.mozilla.org/firefox/downloads/file/4783321/darkreader-4.9.125.xpi";
+              sha256 = "0a5g7rkc0fgnp7fpwk37703yksbwh1csahgq22drpq3kr25s3a91";
+            })
+            (mkAddon {
+              pname = "sponsorblock";
+              version = "6.1.5";
+              addonId = "sponsorBlocker@ajay.app";
+              url = "https://addons.mozilla.org/firefox/downloads/file/4773757/sponsorblock-6.1.5.xpi";
+              sha256 = "051f3gypy72m4irhyk62fkw5bdwid14kdm46g8q8xdxhxjd25v6q";
+            })
+            (mkAddon {
+              pname = "bitwarden";
+              version = "2026.4.0";
+              addonId = "{446900e4-71c2-419f-a6a7-df9c091e268b}";
+              url = "https://addons.mozilla.org/firefox/downloads/file/4796063/bitwarden_password_manager-2026.4.0.xpi";
+              sha256 = "045ffhr158lnafwdpyijhwnzzjf42rgwzpwvzva5b1hwl71zdgfc";
+            })
+            (mkAddon {
+              pname = "catppuccin-mocha-mauve";
+              version = "old";
+              addonId = "{76aabc99-c1a8-4c1e-832b-d4f2941d5a7a}";
+              url = "https://github.com/catppuccin/firefox/releases/download/old/catppuccin_mocha_mauve.xpi";
+              sha256 = "1gkv12034d2dbbvr2fmxbqifmgmfv0lh58my1gmkcvfpxrap6ad5";
+            })
+          ];
+        };
+      };
+    };
+
+  gtk =
+    { pkgs, config, ... }:
+    {
+      gtk = {
+        enable = true;
+        theme = {
+          name = "Catppuccin-Mocha-Standard-Mauve-Dark";
+          package = pkgs.catppuccin-gtk.override {
+            accents = [ "mauve" ];
+            size = "standard";
+            variant = "mocha";
+          };
+        };
+        gtk4.theme = config.gtk.theme;
+        iconTheme = {
+          name = "Papirus-Dark";
+          package = pkgs.papirus-icon-theme;
+        };
+      };
+    };
+
+  home_sops =
+    { pkgs, lib, ... }:
+    {
+      home.activation.sopsAgeKey = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+        KEY_FILE="$HOME/.config/sops/age/keys.txt"
+        SSH_KEY="$HOME/.ssh/id_ed25519"
+        if [ ! -f "$SSH_KEY" ]; then
+          echo "sops-age: $SSH_KEY not found; age key not derived" >&2
+        elif [ ! -f "$KEY_FILE" ]; then
+          mkdir -p "$(dirname "$KEY_FILE")"
+          ${pkgs.ssh-to-age}/bin/ssh-to-age -private-key -i "$SSH_KEY" > "$KEY_FILE"
+          chmod 600 "$KEY_FILE"
+        fi
+      '';
+    };
+
+  vscode =
+    { pkgs, lib, ... }:
+    {
+      # VS Code marks nix-managed extension versions as obsolete when the symlink
+      # layout changes between home-manager generations. Clear .obsolete on each
+      # activation so VS Code starts with a clean slate.
+      home.activation.clearVscodeExtensionsObsolete = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+        $DRY_RUN_CMD rm -f "$HOME/.vscode/extensions/.obsolete"
+      '';
+      programs.vscode = {
+        enable = true;
+        profiles.default = {
+          extensions =
+            (with pkgs.vscode-extensions; [
+              anthropic.claude-code
+              jnoortheen.nix-ide
+              catppuccin.catppuccin-vsc
+              mshr-h.veriloghdl
+              antyos.openscad
+              ms-vscode-remote.remote-ssh
+              signageos.signageos-vscode-sops
+            ])
+            ++ (with pkgs.vscode-marketplace; [
+              slevesque.shader
+              timgjones.hlsltools
+              raczzalan.webgl-glsl-editor
+            ]);
+          userSettings = {
+            "editor.fontFamily" = "'FiraCode Nerd Font', monospace";
+            "editor.fontLigatures" = true;
+            "terminal.integrated.fontFamily" = "'FiraCode Nerd Font'";
+            "workbench.colorTheme" = "Catppuccin Mocha";
+            "extensions.ignoreRecommendations" = true;
+            "git.autofetch" = true;
+            "sops.enabled" = true;
+            "sops.creationEnabled" = false;
+            "files.associations"."secrets/**/*.yaml" = "yaml";
+          };
+        };
+      };
+    };
+
+  virtual_display =
+    {
+      config,
+      pkgs,
+      lib,
+      ...
+    }:
+    let
+      cfg = config.services.virtualDisplay;
+      inherit (lib)
+        getExe'
+        mkEnableOption
+        mkIf
+        mkOption
+        types
+        ;
+
+      kscreen-doctor = getExe' pkgs.kdePackages.kscreen "kscreen-doctor";
+      dbus-send = getExe' pkgs.dbus "dbus-send";
+      udevadm = getExe' pkgs.systemd "udevadm";
+
+      monitorScript = pkgs.writeShellScript "virtual-display-monitor" ''
+        COOKIE=""
+
+        physical_connected() {
+          for f in /sys/class/drm/*/status; do
+            [[ "$f" == *Virtual* ]] && continue
+            [[ "$(<"$f")" == "connected" ]] && return 0
+          done
+          return 1
+        }
+        inhibit() {
+          [[ -n "$COOKIE" ]] && return
+          COOKIE=$(${dbus-send} --session --print-reply \
+            --dest=org.freedesktop.ScreenSaver /ScreenSaver \
+            org.freedesktop.ScreenSaver.Inhibit \
+            string:"virtual-display-manager" string:"Virtual display active" 2>/dev/null \
+            | awk '/uint32/{print $2}') || true
+        }
+        uninhibit() {
+          [[ -z "$COOKIE" ]] && return
+          ${dbus-send} --session \
+            --dest=org.freedesktop.ScreenSaver /ScreenSaver \
+            org.freedesktop.ScreenSaver.UnInhibit \
+            uint32:"$COOKIE" 2>/dev/null || true
+          COOKIE=""
+        }
+        enable_virtual() {
+          ${kscreen-doctor} \
+            output.Virtual-1.enable \
+            output.Virtual-1.mode.${cfg.resolution}@${toString cfg.refreshRate} || true
+          inhibit
+        }
+        disable_virtual() {
+          ${kscreen-doctor} output.Virtual-1.disable || true
+          uninhibit
+        }
+        update_state() {
+          if physical_connected; then
+            disable_virtual
+          else
+            enable_virtual
+          fi
+        }
+        trap 'disable_virtual; exit 0' INT TERM
+
+        while true; do
+          update_state
+          # Process substitution keeps while-read in the parent shell so COOKIE
+          # mutations (inhibit/uninhibit) propagate correctly across hotplug events.
+          while read -r line; do
+            [[ "$line" == *"HOTPLUG=1"* ]] && { sleep 1; update_state; }
+          done < <(${udevadm} monitor --subsystem-match=drm --property 2>/dev/null)
+          sleep 2
+        done
+      '';
+    in
+    {
+      options.services.virtualDisplay = {
+        enable = mkEnableOption "virtual display for headless Wayland sessions";
+        amdgpuPciAddress = mkOption {
+          type = types.str;
+          description = "AMD GPU PCI address for amdgpu.virtual_display (e.g. 0000:03:00.0)";
+        };
+        resolution = mkOption {
+          type = types.str;
+          default = "1920x1080";
+          description = "Virtual display resolution (WIDTHxHEIGHT)";
+        };
+        refreshRate = mkOption {
+          type = types.int;
+          default = 60;
+          description = "Virtual display refresh rate in Hz";
+        };
+      };
+
+      config = mkIf cfg.enable {
+        # amdgpu.virtual_display=ADDR,N creates N virtual DRM connectors at boot.
+        boot.kernelParams = [ "amdgpu.virtual_display=${cfg.amdgpuPciAddress},1" ];
+
+        systemd.user.services.virtual-display-manager = {
+          description = "Manage virtual display for headless Wayland sessions";
+          wantedBy = [ "graphical-session.target" ];
+          partOf = [ "graphical-session.target" ];
+          after = [ "graphical-session.target" ];
+          serviceConfig = {
+            Type = "simple";
+            ExecStart = monitorScript;
+            Restart = "on-failure";
+            RestartSec = "5s";
+          };
+        };
+      };
+    };
+
+  home =
+    { config, ... }:
+    {
+      imports = [
+        firefox
+        gtk
+        home_sops
+        vscode
+      ];
+      programs = {
+        plasma = {
+          enable = true;
+          workspace = {
+            colorScheme = "CatppuccinMochaMauve";
+            iconTheme = "Papirus-Dark";
+            splashScreen.theme = "None";
+            wallpaperPictureOfTheDay.provider = "apod";
+          };
+        };
+        wezterm = {
+          enable = true;
+          extraConfig = ''
+            local wezterm = require("wezterm")
+            return {
+              font = wezterm.font("FiraCode Nerd Font", { weight = "Regular" }),
+              font_size = 12.0,
+              harfbuzz_features = { "calt=1", "clig=1", "liga=1" },
+              color_scheme = "Catppuccin Mocha",
+            }
+          '';
+        };
+        zsh = {
+          enable = true;
+          syntaxHighlighting.enable = true;
+          autosuggestion.enable = true;
+          oh-my-zsh = {
+            enable = true;
+            theme = "robbyrussell";
+            plugins = [ "git" ];
+          };
+          shellAliases.wanip = "curl -s ifconfig.me && echo";
+        };
+      };
+      xdg = {
+        configFile."baloofilerc".text = ''
+          [Basic Settings]
+          Indexing-Enabled=false
+        '';
+        desktopEntries.vkquake = {
+          name = "vkQuake";
+          comment = "Vulkan Quake port based on QuakeSpasm";
+          exec = "vkquake -basedir ${config.home.homeDirectory}/Games/Heroic/Quake";
+          icon = "vkquake";
+          categories = [ "Game" ];
+        };
+      };
+      services.vscode-server.enable = true;
+      home.stateVersion = "25.11";
+    };
+
+  workstation =
+    {
+      lib,
+      pkgs,
+      userNames,
+      plasma-manager,
+      nixos-vscode-server,
+      ...
+    }:
+    {
+      imports = [
+        overlays
+        desktop
+        packages
+        wake_on_lan
+        users
+      ];
+      security.rtkit.enable = true;
+      services = {
+        pulseaudio.enable = false;
+        pipewire = {
+          enable = true;
+          alsa = {
+            enable = true;
+            support32Bit = true;
+          };
+          pulse.enable = true;
+        };
+        blueman.enable = true;
+        printing.enable = true;
+        openssh.enable = true;
+      };
+      hardware.bluetooth.enable = true;
+      boot.loader = {
+        systemd-boot.enable = true;
+        efi.canTouchEfiVariables = true;
+      };
+      time.timeZone = "America/New_York";
+      i18n.defaultLocale = "en_US.UTF-8";
+      networking = {
+        domain = "freyground.com";
+        networkmanager.enable = true;
+      };
+      nix.settings.experimental-features = [
+        "nix-command"
+        "flakes"
+      ];
+      sops.age.sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ];
+      fonts.packages = [ pkgs.nerd-fonts.fira-code ];
+      programs = {
+        steam.enable = true;
+        alvr.enable = true;
+        zsh.enable = true;
+      };
+      home-manager = {
+        useGlobalPkgs = true;
+        useUserPackages = true;
+        backupFileExtension = "backup";
+        sharedModules = [
+          plasma-manager.homeModules.plasma-manager
+          nixos-vscode-server.homeModules.default
+        ];
+        users = lib.genAttrs userNames (_: home);
+      };
+      system.stateVersion = "25.11";
+    };
+in
+{ inherit workstation virtual_display; }

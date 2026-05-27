@@ -1,3 +1,8 @@
+# Features:
+# - Three NixOS hosts: glw (local), batpc, homebase — deployed via colmena
+# - Dev shell with colmena, sops, age, ssh-to-age
+# - Docker container image (bashInteractive, port 8080)
+# - Nix formatter (nixfmt-tree)
 {
   description = "NixOS configuration";
 
@@ -28,10 +33,6 @@
       url = "github:nix-community/nixos-vscode-server";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    fireplace-wallpaper = {
-      url = "path:./pkg/fireplace-wallpaper";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
     sops-nix = {
       url = "github:Mic92/sops-nix";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -48,7 +49,6 @@
       nur,
       rust-overlay,
       nixos-vscode-server,
-      fireplace-wallpaper,
       sops-nix,
     }:
     let
@@ -56,21 +56,19 @@
       pkgs = nixpkgs.legacyPackages.${system};
 
       adminKeys = [
-        # CODEGEN-SSH-KEYS BEGIN
         "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIID3zQxfqqgGv8+/6wGgzurL88B3hlwTepTAKbtJ7lA+"
         "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEmOnmo37JPC327L/32yJD1uvr2ZDMZj4mQUiS5SlPqC"
         "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOuJ2lCWkbRz9eRQGAFOQTIiQe05ZGdIa+quR5FISPu3"
-        # CODEGEN-SSH-KEYS END
-        # CODEGEN-SSH-KEYS BEGIN user=lunariandreams
         "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJbOMuvl7nT+VuKapbIpU9kOjRluhWI1NcrspdAh5F1F"
         "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINZ02vs+8bntaG+2l6bfHqTUawA/31dp/sRXCKs8YhAi"
-        # CODEGEN-SSH-KEYS END
       ];
 
       userNames = [
         "gen"
         "bat"
       ];
+
+      mods = import ./modules.nix;
 
       mkHost =
         {
@@ -85,11 +83,20 @@
             hwconfig
             home-manager.nixosModules.home-manager
             sops-nix.nixosModules.sops
-            ./modules/roles/workstation.nix
-          ] ++ extraModules;
+            mods.workstation
+          ]
+          ++ extraModules;
           networking.hostName = name;
-          deployment = deployment;
+          inherit deployment;
         };
+
+      amdgpu = {
+        services.xserver.videoDrivers = [ "amdgpu" ];
+        hardware.graphics = {
+          enable = true;
+          enable32Bit = true;
+        };
+      };
     in
     {
       packages.${system}.container = pkgs.dockerTools.buildLayeredImage {
@@ -132,41 +139,94 @@
           };
         };
 
-        defaults =
-          { ... }:
-          {
-            deployment.buildOnTarget = true;
-          };
+        defaults.deployment = {
+          buildOnTarget = true;
+          targetUser = "root";
+        };
 
         glw = mkHost {
           name = "glw";
-          hwconfig = ./pkg/hwconfig/glw.nix;
+          hwconfig = ./hwdef/glw.nix;
           deployment = {
             targetHost = null;
             allowLocalDeployment = true;
           };
-          extraModules = [ ./hosts/glw.nix ];
+          extraModules = [
+            amdgpu
+            ({ pkgs, ... }: { environment.systemPackages = [ pkgs.moonlight-qt ]; })
+          ];
         };
 
         batpc = mkHost {
           name = "batpc";
-          hwconfig = ./pkg/hwconfig/batpc.nix;
-          deployment = {
-            targetHost = "batpc.lan";
-            targetUser = "root";
-          };
+          hwconfig = ./hwdef/batpc.nix;
+          deployment.targetHost = "batpc.lan";
+          extraModules = [
+            {
+              services.xserver.videoDrivers = [ "nvidia" ];
+              hardware.nvidia.modesetting.enable = true;
+              hardware.graphics = {
+                enable = true;
+                enable32Bit = true;
+              };
+            }
+          ];
         };
 
         homebase = mkHost {
           name = "homebase";
-          hwconfig = ./pkg/hwconfig/homebase.nix;
-          deployment = {
-            targetHost = "homebase.lan";
-            targetUser = "root";
-          };
+          hwconfig = ./hwdef/homebase.nix;
+          deployment.targetHost = "homebase.freyground.com";
           extraModules = [
-            fireplace-wallpaper.nixosModules.default
-            ./hosts/homebase.nix
+            amdgpu
+            mods.virtual_display
+            (
+              { ... }:
+              let
+                displayTimeoutMs = 600000;
+              in
+              {
+                services = {
+                  virtualDisplay = {
+                    enable = true;
+                    amdgpuPciAddress = "0000:03:00.0";
+                  };
+                  fwupd.enable = false;
+                  sunshine = {
+                    enable = true;
+                    autoStart = true;
+                    capSysAdmin = true;
+                    openFirewall = true;
+                  };
+                };
+
+                systemd.sleep.settings.Sleep = {
+                  AllowSuspend = false;
+                  AllowHibernation = false;
+                };
+
+                home-manager.users.gen = {
+                  programs.plasma = {
+                    kscreenlocker = {
+                      autoLock = true;
+                      lockOnResume = false;
+                      appearance.alwaysShowClock = false;
+                    };
+                    configFile."kscreenlockerrc" = {
+                      "Daemon" = {
+                        "Timeout" = "10";
+                        # Large grace period so screensaver dismisses without password prompt
+                        "LockGrace" = "999999";
+                      };
+                    };
+                    powerdevil.AC.turnOffDisplay = {
+                      idleTimeout = displayTimeoutMs;
+                      idleTimeoutWhenLocked = displayTimeoutMs;
+                    };
+                  };
+                };
+              }
+            )
           ];
         };
       };

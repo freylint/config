@@ -1,3 +1,6 @@
+# Features:
+# - Rust embedded firmware package (thumbv7em-none-eabihf / ARM Cortex-M)
+# - Dev shell with Rust beta toolchain and probe-rs debugger
 {
   description = "collar";
 
@@ -52,10 +55,10 @@
       };
 
       devShells.${system}.default = pkgs.mkShell {
-        buildInputs = [
+        buildInputs = with pkgs; [
           rustToolchain
-          pkgs.gcc
-          pkgs.probe-rs-tools
+          gcc
+          probe-rs-tools
         ];
       };
     };

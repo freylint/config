@@ -4,6 +4,14 @@ Task runner — interactive TUI or direct execution.
 
   ./run.py              # interactive menu
   ./run.py <target>     # run named target directly
+
+Features:
+  - Targets: deploy, deploy-hosts, deploy-local, collar, lightsail, rekey,
+             lock, unlock, ss-dev, vdisp-test
+  - Deploy pipeline: WoL, hwdef, flake update, fmt, colmena apply
+  - AWS Lightsail container build and deploy
+  - SOPS secret rekeying
+  - Interactive curses TUI with keyboard navigation
 """
 
 from __future__ import annotations
@@ -12,6 +20,7 @@ import curses
 import json
 import os
 import re
+import socket
 import subprocess
 import sys
 import time
@@ -25,16 +34,17 @@ from typing import Callable
 
 REPO = Path(__file__).parent
 NIXOS = REPO
-COLLAR = REPO / "collar"
+COLLAR = REPO / "pkg" / "collar"
 
 # ---------------------------------------------------------------------------
-# Host inventory (formerly Ansible inventory)
+# Host inventory
 # ---------------------------------------------------------------------------
 
-HOSTS: dict[str, dict[str, str]] = {
-    "glw":      {"host": "glw.lan",                "user": "gen"},
-    "batpc":    {"host": "batpc.lan",               "user": "bat"},
-    "homebase": {"host": "homebase.freyground.com", "user": "gen"},
+HOSTS: dict[str, dict] = {
+    # mac: set to "aa:bb:cc:dd:ee:ff" to enable Wake-on-LAN; None disables WoL
+    "glw": {"host": "glw.lan", "user": "gen", "mac": None},
+    "batpc": {"host": "batpc.lan", "user": "bat", "mac": None},
+    "homebase": {"host": "homebase.freyground.com", "user": "gen", "mac": None},
 }
 
 # ---------------------------------------------------------------------------
@@ -53,7 +63,7 @@ class Target:
 
 
 TARGETS: list[Target] = [
-    Target("deploy",       "Full deploy: codegen → hwconfig → update → fmt → colmena all", None),
+    Target("deploy",       "Full deploy: hwdef → update → fmt → colmena all", None),
     Target("deploy-hosts", "Deploy to HOSTS (comma-separated env var)",                     None),
     Target("deploy-local", "Apply config to local machine via colmena apply-local",         None),
     Target("collar",       "Build collar embedded firmware via nix",                         None),
@@ -61,7 +71,9 @@ TARGETS: list[Target] = [
     Target("rekey",        "Re-encrypt all sops secrets for current key set",                    None),
     Target("lock",         "Lock the display session",   lambda: ["loginctl", "lock-session",   _session()]),
     Target("unlock",       "Unlock the display session", lambda: ["loginctl", "unlock-session", _session()]),
+    Target("flake-update", "Update flake.lock (nix flake update)",                           None),
     Target("ss-dev",       "Screensaver dev cycle: unlock → wait 5s → lock",                None),
+    Target("vdisp-test",   "Check virtual display service and DRM state on homebase",        None),
 ]
 
 _TARGET_MAP: dict[str, Target] = {t.name: t for t in TARGETS}
@@ -97,28 +109,55 @@ def _nixos(*args: str) -> list[str]:
     """Wrap a command to run inside the nixos devShell."""
     return ["nix", "develop", str(NIXOS), "--command", *args]
 
+
+def _wake(mac: str) -> None:
+    mac_bytes = bytes.fromhex(mac.replace(":", "").replace("-", ""))
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        s.sendto(b"\xff" * 6 + mac_bytes * 16, ("<broadcast>", 9))
+
+
+def _wait_online(host: str, timeout: int = 60) -> bool:
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if _capture(["ping", "-c1", "-W1", host]).returncode == 0:
+            return True
+        time.sleep(2)
+    return False
+
+
+def _wake_hosts(targets: dict[str, dict]) -> int:
+    for name, info in targets.items():
+        if not (mac := info.get("mac")):
+            continue
+        if _capture(["ping", "-c1", "-W1", info["host"]]).returncode == 0:
+            continue
+        print(f"  waking {name}")
+        _wake(mac)
+        print(f"  waiting for {name}", end="", flush=True)
+        if _wait_online(info["host"]):
+            print(" online")
+        else:
+            print(f"\n  WARNING: {name} did not come online", file=sys.stderr)
+    return 0
+
 # ---------------------------------------------------------------------------
 # Deploy pipeline steps
 # ---------------------------------------------------------------------------
 
 
-def _codegen() -> int:
-    print("  codegen")
-    return _run(
-        ["python3", str(NIXOS / "scripts/codegen.py"), str(NIXOS)],
-    )
-
-
-def _update_hwconfig(name: str, info: dict[str, str]) -> None:
-    print(f"  hwconfig: {name}")
+def _update_hwdef(name: str, info: dict) -> bool:
+    """Fetch hardware config from host via SSH. Returns True on success."""
+    print(f"  hwdef: {name}")
     result = _capture(["ssh", f"{info['user']}@{info['host']}",
                         "sudo nixos-generate-config --show-hardware-config"])
     if result.returncode != 0:
-        print(f"  WARNING: hwconfig failed for {name}: {result.stderr.strip()}", file=sys.stderr)
-        return
-    path = NIXOS / "pkg/hwconfig" / f"{name}.nix"
+        print(f"  WARNING: hwdef failed for {name}: {result.stderr.strip()}", file=sys.stderr)
+        return False
+    path = NIXOS / "hwdef" / f"{name}.nix"
     path.write_text(result.stdout)
     subprocess.run(["git", "add", str(path)], cwd=REPO)
+    return True
 
 
 def _flake_update() -> int:
@@ -142,8 +181,8 @@ def _pipeline(on: list[str] | None = None) -> int:
     targets = {k: v for k, v in HOSTS.items() if on is None or k in on}
 
     steps: list[tuple[str, Callable[[], int | None]]] = [
-        ("codegen",        _codegen),
-        ("hwconfigs",      lambda: [_update_hwconfig(n, i) for n, i in targets.items()] and None),
+        ("wake",           lambda: _wake_hosts(targets)),
+        ("hwdefs",         lambda: 0 if all([_update_hwdef(n, i) for n, i in targets.items()]) else 1),
         ("flake update",   _flake_update),
         ("fmt",            _fmt),
         ("colmena apply",  lambda: _colmena(on)),
@@ -162,9 +201,9 @@ def _pipeline(on: list[str] | None = None) -> int:
 
 
 def _lightsail() -> int:
-    service  = os.environ.get("LIGHTSAIL_SERVICE", "app")
-    label    = os.environ.get("LIGHTSAIL_LABEL",   "app")
-    port     = os.environ.get("LIGHTSAIL_PORT",    "8080")
+    service = os.environ.get("LIGHTSAIL_SERVICE", "app")
+    label = os.environ.get("LIGHTSAIL_LABEL", "app")
+    port = os.environ.get("LIGHTSAIL_PORT", "8080")
     protocol = os.environ.get("LIGHTSAIL_PROTOCOL", "HTTP")
 
     print("→ nix build .#container")
@@ -194,10 +233,10 @@ def _lightsail() -> int:
     image_ref = ref_match.group(1)
 
     containers = json.dumps({label: {"image": image_ref, "ports": {port: protocol}}})
-    endpoint   = json.dumps({
+    endpoint = json.dumps({
         "containerName": label,
         "containerPort": int(port),
-        "healthCheck":   {"path": "/"},
+        "healthCheck": {"path": "/"},
     })
 
     print(f"→ lightsail create-container-service-deployment ({image_ref})")
@@ -227,6 +266,31 @@ def _rekey() -> int:
 
 
 # ---------------------------------------------------------------------------
+# Virtual display diagnostics
+# ---------------------------------------------------------------------------
+
+
+def _vdisp_test() -> int:
+    info = HOSTS["homebase"]
+    host, user = info["host"], info["user"]
+    diag = (
+        "echo '=== DRM connectors ==='; "
+        "for f in /sys/class/drm/*/status; do "
+        "  echo \"$(basename $(dirname $f)): $(cat $f)\"; "
+        "done; "
+        "echo; echo '=== virtual-display-manager service ==='; "
+        "systemctl --user status virtual-display-manager --no-pager 2>&1 || true; "
+        "echo; echo '=== kscreen outputs ==='; "
+        "WAYLAND_DISPLAY=wayland-0 "
+        "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(id -u)/bus "
+        "kscreen-doctor --outputs 2>&1 || true; "
+        "echo; echo '=== virtual-display-manager journal ==='; "
+        "journalctl --user -u virtual-display-manager -n 20 --no-pager 2>&1 || true"
+    )
+    return _run(["ssh", f"{user}@{host}", diag])
+
+
+# ---------------------------------------------------------------------------
 # Target dispatch
 # ---------------------------------------------------------------------------
 
@@ -248,6 +312,8 @@ def run_target(target: Target) -> int:
             return _run(["nix", "build", ".#default"], cwd=COLLAR)
         case "lightsail":
             return _lightsail()
+        case "flake-update":
+            return _flake_update()
         case "rekey":
             return _rekey()
         case "ss-dev":
@@ -255,6 +321,8 @@ def run_target(target: Target) -> int:
             _run(["loginctl", "unlock-session", sess])
             time.sleep(5)
             return _run(["loginctl", "lock-session", sess])
+        case "vdisp-test":
+            return _vdisp_test()
         case _:
             cmd = target.build_cmd()
             if cmd is None:
