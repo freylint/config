@@ -1,13 +1,13 @@
 # Features:
 # - overlays: NUR, rust-overlay, nix-vscode-extensions overlays; unfree allowed
 # - desktop: KDE Plasma 6, SDDM Wayland, ksshaskpass, excluded KDE packages
-# - packages: system packages — dev, infra, eda, desktop groups
+# - packages: system packages — dev, infra (nil LSP), eda, desktop groups
 # - wake_on_lan: WoL (magic packet) on all physical Ethernet interfaces at boot
 # - users: normal users with wheel/networkmanager groups and admin SSH keys
 # - firefox: DuckDuckGo, vertical tabs, uBlock Origin, Dark Reader, SponsorBlock, Bitwarden, Catppuccin
 # - gtk: Catppuccin Mocha Mauve GTK theme, Papirus-Dark icons
 # - home_sops: SOPS age key derived from SSH ed25519 key on activation
-# - vscode: extensions, FiraCode, Catppuccin Mocha, SOPS integration
+# - vscode: extensions, FiraCode, Catppuccin Mocha, SOPS integration, nil Nix LSP
 # - virtual_display: AMD virtual display connector for headless Wayland sessions
 # - home: home-manager module — Firefox, GTK, VS Code, plasma, WezTerm, Zsh, Baloo, games
 # - workstation: workstation role — all NixOS config + home-manager wiring
@@ -93,6 +93,7 @@ let
         colmena
         claude-code
         jq
+        nil
         sops
         age
         ssh-to-age
@@ -286,6 +287,8 @@ let
             "workbench.colorTheme" = "Catppuccin Mocha";
             "extensions.ignoreRecommendations" = true;
             "git.autofetch" = true;
+            "nix.enableLanguageServer" = true;
+            "nix.serverPath" = "nil";
             "sops.enabled" = true;
             "sops.creationEnabled" = false;
             "files.associations"."secrets/**/*.yaml" = "yaml";
