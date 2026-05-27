@@ -287,6 +287,7 @@ let
             "workbench.colorTheme" = "Catppuccin Mocha";
             "extensions.ignoreRecommendations" = true;
             "git.autofetch" = true;
+            "git.confirmSync" = false;
             "nix.enableLanguageServer" = true;
             "nix.serverPath" = "nil";
             "sops.enabled" = true;
