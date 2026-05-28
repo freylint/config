@@ -13,3 +13,7 @@
 # Rust
 **/target/
 Cargo.lock
+
+# Node / npm
+node_modules/
+dist/

@@ -1,16 +1,15 @@
 # Features:
 # - overlays: NUR, rust-overlay, nix-vscode-extensions overlays; unfree allowed
 # - desktop: KDE Plasma 6, SDDM Wayland, ksshaskpass, excluded KDE packages
-# - packages: system packages — dev, infra (nil LSP), eda, desktop groups
+# - packages: system packages — dev, infra (nil LSP, awscli2), eda, desktop groups
 # - wake_on_lan: WoL (magic packet) on all physical Ethernet interfaces at boot
 # - users: normal users with wheel/networkmanager groups and admin SSH keys
 # - firefox: DuckDuckGo, vertical tabs, uBlock Origin, Dark Reader, SponsorBlock, Bitwarden, Catppuccin
 # - gtk: Catppuccin Mocha Mauve GTK theme, Papirus-Dark icons
 # - home_sops: SOPS age key derived from SSH ed25519 key on activation
-# - vscode: extensions, FiraCode, Catppuccin Mocha, SOPS integration, nil Nix LSP
-# - virtual_display: AMD virtual display connector for headless Wayland sessions
+# - vscode: extensions, FiraCode, Catppuccin Mocha, SOPS integration, nil Nix LSP, vscodevim
 # - home: home-manager module — Firefox, GTK, VS Code, plasma, WezTerm, Zsh, Baloo, games
-# - workstation: workstation role — all NixOS config + home-manager wiring
+# - workstation: workstation role — all NixOS config + home-manager wiring, Docker enabled
 let
   overlays =
     {
@@ -74,6 +73,18 @@ let
 
   packages =
     { pkgs, ... }:
+    let
+      lightsailctl = pkgs.stdenvNoCC.mkDerivation {
+        pname = "lightsailctl";
+        version = "latest";
+        src = pkgs.fetchurl {
+          url = "https://lightsailctl.s3-us-west-2.amazonaws.com/latest/linux-amd64/lightsailctl";
+          sha256 = "1vasazl643dmk4kqq22rg3i9nvg6g0pdnvg3lvay4cl8ijdnbdyh";
+        };
+        dontUnpack = true;
+        installPhase = "install -Dm755 $src $out/bin/lightsailctl";
+      };
+    in
     {
       environment.systemPackages = with pkgs; [
         # dev
@@ -92,6 +103,8 @@ let
         # infra
         colmena
         claude-code
+        awscli2
+        lightsailctl
         jq
         nil
         sops
@@ -152,6 +165,7 @@ let
         extraGroups = [
           "networkmanager"
           "wheel"
+          "docker"
         ];
         shell = pkgs.zsh;
         openssh.authorizedKeys.keys = adminKeys;
@@ -274,6 +288,7 @@ let
               antyos.openscad
               ms-vscode-remote.remote-ssh
               signageos.signageos-vscode-sops
+              vscodevim.vim
             ])
             ++ (with pkgs.vscode-marketplace; [
               slevesque.shader
@@ -293,121 +308,6 @@ let
             "sops.enabled" = true;
             "sops.creationEnabled" = false;
             "files.associations"."secrets/**/*.yaml" = "yaml";
-          };
-        };
-      };
-    };
-
-  virtual_display =
-    {
-      config,
-      pkgs,
-      lib,
-      ...
-    }:
-    let
-      cfg = config.services.virtualDisplay;
-      inherit (lib)
-        getExe'
-        mkEnableOption
-        mkIf
-        mkOption
-        types
-        ;
-
-      kscreen-doctor = getExe' pkgs.kdePackages.kscreen "kscreen-doctor";
-      dbus-send = getExe' pkgs.dbus "dbus-send";
-      udevadm = getExe' pkgs.systemd "udevadm";
-
-      monitorScript = pkgs.writeShellScript "virtual-display-monitor" ''
-        COOKIE=""
-
-        physical_connected() {
-          for f in /sys/class/drm/*/status; do
-            [[ "$f" == *Virtual* ]] && continue
-            [[ "$(<"$f")" == "connected" ]] && return 0
-          done
-          return 1
-        }
-        inhibit() {
-          [[ -n "$COOKIE" ]] && return
-          COOKIE=$(${dbus-send} --session --print-reply \
-            --dest=org.freedesktop.ScreenSaver /ScreenSaver \
-            org.freedesktop.ScreenSaver.Inhibit \
-            string:"virtual-display-manager" string:"Virtual display active" 2>/dev/null \
-            | awk '/uint32/{print $2}') || true
-        }
-        uninhibit() {
-          [[ -z "$COOKIE" ]] && return
-          ${dbus-send} --session \
-            --dest=org.freedesktop.ScreenSaver /ScreenSaver \
-            org.freedesktop.ScreenSaver.UnInhibit \
-            uint32:"$COOKIE" 2>/dev/null || true
-          COOKIE=""
-        }
-        enable_virtual() {
-          ${kscreen-doctor} \
-            output.Virtual-1.enable \
-            output.Virtual-1.mode.${cfg.resolution}@${toString cfg.refreshRate} || true
-          inhibit
-        }
-        disable_virtual() {
-          ${kscreen-doctor} output.Virtual-1.disable || true
-          uninhibit
-        }
-        update_state() {
-          if physical_connected; then
-            disable_virtual
-          else
-            enable_virtual
-          fi
-        }
-        trap 'disable_virtual; exit 0' INT TERM
-
-        while true; do
-          update_state
-          # Process substitution keeps while-read in the parent shell so COOKIE
-          # mutations (inhibit/uninhibit) propagate correctly across hotplug events.
-          while read -r line; do
-            [[ "$line" == *"HOTPLUG=1"* ]] && { sleep 1; update_state; }
-          done < <(${udevadm} monitor --subsystem-match=drm --property 2>/dev/null)
-          sleep 2
-        done
-      '';
-    in
-    {
-      options.services.virtualDisplay = {
-        enable = mkEnableOption "virtual display for headless Wayland sessions";
-        amdgpuPciAddress = mkOption {
-          type = types.str;
-          description = "AMD GPU PCI address for amdgpu.virtual_display (e.g. 0000:03:00.0)";
-        };
-        resolution = mkOption {
-          type = types.str;
-          default = "1920x1080";
-          description = "Virtual display resolution (WIDTHxHEIGHT)";
-        };
-        refreshRate = mkOption {
-          type = types.int;
-          default = 60;
-          description = "Virtual display refresh rate in Hz";
-        };
-      };
-
-      config = mkIf cfg.enable {
-        # amdgpu.virtual_display=ADDR,N creates N virtual DRM connectors at boot.
-        boot.kernelParams = [ "amdgpu.virtual_display=${cfg.amdgpuPciAddress},1" ];
-
-        systemd.user.services.virtual-display-manager = {
-          description = "Manage virtual display for headless Wayland sessions";
-          wantedBy = [ "graphical-session.target" ];
-          partOf = [ "graphical-session.target" ];
-          after = [ "graphical-session.target" ];
-          serviceConfig = {
-            Type = "simple";
-            ExecStart = monitorScript;
-            Restart = "on-failure";
-            RestartSec = "5s";
           };
         };
       };
@@ -489,8 +389,10 @@ let
         packages
         wake_on_lan
         users
+        # virtual-display moved to pkg/virtual-display/ (standalone flake, imported by flake.nix)
       ];
       security.rtkit.enable = true;
+      virtualisation.docker.enable = true;
       services = {
         pulseaudio.enable = false;
         pipewire = {
@@ -540,4 +442,4 @@ let
       system.stateVersion = "25.11";
     };
 in
-{ inherit workstation virtual_display; }
+{ inherit workstation; }

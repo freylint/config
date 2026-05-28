@@ -1,0 +1,20 @@
+{
+  "name": "www",
+  "version": "0.1.0",
+  "scripts": {
+    "build": "tsc --noEmit && esbuild src/index.ts --bundle --outfile=dist/bundle.js && esbuild src/serve.ts --bundle --platform=node --packages=external --format=cjs --outfile=dist/serve.cjs",
+    "dev": "esbuild src/index.ts --bundle --outfile=dist/bundle.js --watch --servedir=.",
+    "typecheck": "tsc --noEmit",
+    "dist": "npm run build && node --experimental-sea-config sea-config.json && cp $(node -e 'process.stdout.write(process.execPath)') dist/server && postject dist/server NODE_SEA_BLOB dist/sea.blob --sentinel-fuse NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2"
+  },
+  "dependencies": {
+    "mithril": "^2.2.2"
+  },
+  "devDependencies": {
+    "@types/mithril": "^2.0.0",
+    "@types/node": "^22.0.0",
+    "esbuild": "^0.24.0",
+    "postject": "1.0.0-alpha.6",
+    "typescript": "^5.0.0"
+  }
+}

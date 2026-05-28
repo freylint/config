@@ -1,8 +1,10 @@
 # Features:
 # - Three NixOS hosts: glw (local), batpc, homebase — deployed via colmena
 # - Dev shell with colmena, sops, age, ssh-to-age
-# - Docker container image (bashInteractive, port 8080)
+# - Docker container image (Node.js www SPA; TypeScript+Mithril bundled via buildNpmPackage, port 8080)
 # - Nix formatter (nixfmt-tree)
+# - virtual-display: local NixOS module sub-flake (pkg/virtual-display) providing AMD virtual display for homebase
+# - virtual-display-vm: QEMU test VM for the virtual-display module (nix run .#vdisp-vm; SSH :2222 root/root)
 {
   description = "NixOS configuration";
 
@@ -37,6 +39,10 @@
       url = "github:Mic92/sops-nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    # Local sub-flake (pkg/virtual-display) consumed as a NixOS module only.
+    # Has no external inputs, so no `inputs.nixpkgs.follows` is needed.
+    # `path:` inputs carry no narHash in the lock; freshness is ensured by `--impure` at deploy time.
+    virtual-display.url = "path:./pkg/virtual-display";
   };
 
   outputs =
@@ -50,6 +56,7 @@
       rust-overlay,
       nixos-vscode-server,
       sops-nix,
+      virtual-display,
     }:
     let
       system = "x86_64-linux";
@@ -97,31 +104,61 @@
           enable32Bit = true;
         };
       };
+
+      vdispVm = self.nixosConfigurations.virtual-display-vm.config.system.build.vm;
+      containerPort = 8080; # Lightsail LB terminates TLS; container speaks plain HTTP
+      # $out/dist/{bundle.js,serve.cjs} + $out/index.html — __dirname in serve.ts resolves to $out/dist/
+      wwwBundle = pkgs.buildNpmPackage {
+        pname = "www";
+        version = "0.1.0";
+        src = ./pkg/www;
+        # npmDepsHash covers TS devDeps: typescript ^5, @types/mithril ^2, @types/node ^22 — rebump when these change
+        npmDepsHash = "sha256-XC3m7o5D+uLbBpAclsY2ThSUY48iSc4+YJN/K1Ho0hw=";
+        installPhase = ''
+          runHook preInstall
+          mkdir -p $out
+          cp dist/bundle.js dist/serve.cjs $out/
+          runHook postInstall
+        '';
+        dontFixup = true;
+      };
+      wwwApp = pkgs.runCommand "www-app" { } ''
+        mkdir -p $out/dist
+        cp ${./pkg/www/index.html} $out/index.html
+        cp ${wwwBundle}/bundle.js ${wwwBundle}/serve.cjs $out/dist/
+      '';
     in
     {
-      packages.${system}.container = pkgs.dockerTools.buildLayeredImage {
-        name = "app";
-        tag = "latest";
-        contents = with pkgs; [
-          bashInteractive
-          coreutils
-        ];
-        config = {
-          Cmd = [ "${pkgs.bashInteractive}/bin/bash" ];
-          ExposedPorts."8080/tcp" = { };
+      inherit containerPort;
+      packages.${system} = {
+        container = pkgs.dockerTools.buildLayeredImage {
+          name = "app";
+          tag = "latest";
+          contents = with pkgs; [ bashInteractive coreutils nodejs_22 wwwApp dockerTools.fakeNss ];
+          config = {
+            Cmd = [ "${pkgs.nodejs_22}/bin/node" "${wwwApp}/dist/serve.cjs" ];
+            ExposedPorts."${toString containerPort}/tcp" = { };
+            Env = [ "PORT=${toString containerPort}" ];
+          };
         };
+        virtual-display-vm = vdispVm;
       };
 
       devShells.${system}.default = pkgs.mkShell {
-        packages = with pkgs; [
-          colmena
-          sops
-          age
-          ssh-to-age
-        ];
+        packages = with pkgs; [ colmena sops age ssh-to-age ];
       };
 
       formatter.${system} = pkgs.nixfmt-tree;
+
+      nixosConfigurations.virtual-display-vm = nixpkgs.lib.nixosSystem {
+        inherit system;
+        modules = [ virtual-display.nixosModules.default ./pkg/virtual-display/vm.nix ];
+      };
+
+      apps.${system}.vdisp-vm = {
+        type = "app";
+        program = nixpkgs.lib.getExe vdispVm;
+      };
 
       colmena = {
         meta = {
@@ -179,7 +216,7 @@
           deployment.targetHost = "homebase.freyground.com";
           extraModules = [
             amdgpu
-            mods.virtual_display
+            virtual-display.nixosModules.default
             (
               { ... }:
               let

@@ -7,9 +7,9 @@ Task runner — interactive TUI or direct execution.
 
 Features:
   - Targets: deploy, deploy-hosts, deploy-local, collar, lightsail, rekey,
-             lock, unlock, ss-dev, vdisp-test
+             flake-update, lock, unlock, ss-dev, vdisp-test, vdisp-vm
   - Deploy pipeline: WoL, hwdef, flake update, fmt, colmena apply
-  - AWS Lightsail container build and deploy
+  - AWS Lightsail container build and deploy (nix build → docker load → push → deploy)
   - SOPS secret rekeying
   - Interactive curses TUI with keyboard navigation
 """
@@ -74,6 +74,7 @@ TARGETS: list[Target] = [
     Target("flake-update", "Update flake.lock (nix flake update)",                           None),
     Target("ss-dev",       "Screensaver dev cycle: unlock → wait 5s → lock",                None),
     Target("vdisp-test",   "Check virtual display service and DRM state on homebase",        None),
+    Target("vdisp-vm",     "Build and run virtual-display test VM (SSH :2222 root/root)",    None),
 ]
 
 _TARGET_MAP: dict[str, Target] = {t.name: t for t in TARGETS}
@@ -182,7 +183,7 @@ def _pipeline(on: list[str] | None = None) -> int:
 
     steps: list[tuple[str, Callable[[], int | None]]] = [
         ("wake",           lambda: _wake_hosts(targets)),
-        ("hwdefs",         lambda: 0 if all([_update_hwdef(n, i) for n, i in targets.items()]) else 1),
+        ("hwdefs",         lambda: 0 if all(_update_hwdef(n, i) for n, i in targets.items()) else 1),
         ("flake update",   _flake_update),
         ("fmt",            _fmt),
         ("colmena apply",  lambda: _colmena(on)),
@@ -201,10 +202,16 @@ def _pipeline(on: list[str] | None = None) -> int:
 
 
 def _lightsail() -> int:
-    service = os.environ.get("LIGHTSAIL_SERVICE", "app")
-    label = os.environ.get("LIGHTSAIL_LABEL", "app")
-    port = os.environ.get("LIGHTSAIL_PORT", "8080")
+    service = os.environ.get("LIGHTSAIL_SERVICE", "jump")
+    label = os.environ.get("LIGHTSAIL_LABEL", "jump")
     protocol = os.environ.get("LIGHTSAIL_PROTOCOL", "HTTP")
+
+    if _capture(["aws", "sts", "get-caller-identity"]).returncode:
+        print("error: AWS credentials not configured (set AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY or configure ~/.aws/credentials)", file=sys.stderr)
+        return 1
+
+    _port_r = _capture(["nix", "eval", "--json", f"{NIXOS}#containerPort"])
+    port = os.environ.get("LIGHTSAIL_PORT") or (_port_r.stdout.strip() if _port_r.returncode == 0 else "8080")
 
     print("→ nix build .#container")
     if _run(["nix", "build", ".#container", "--out-link", "/tmp/lightsail-container"], cwd=NIXOS):
@@ -323,6 +330,8 @@ def run_target(target: Target) -> int:
             return _run(["loginctl", "lock-session", sess])
         case "vdisp-test":
             return _vdisp_test()
+        case "vdisp-vm":
+            return _run(["nix", "run", "--impure", f"{NIXOS}#vdisp-vm"])
         case _:
             cmd = target.build_cmd()
             if cmd is None:

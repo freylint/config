@@ -169,7 +169,8 @@
         "nur": "nur",
         "plasma-manager": "plasma-manager",
         "rust-overlay": "rust-overlay",
-        "sops-nix": "sops-nix"
+        "sops-nix": "sops-nix",
+        "virtual-display": "virtual-display"
       }
     },
     "rust-overlay": {
@@ -226,6 +227,17 @@
         "repo": "default",
         "type": "github"
       }
+    },
+    "virtual-display": {
+      "locked": {
+        "path": "./pkg/virtual-display",
+        "type": "path"
+      },
+      "original": {
+        "path": "./pkg/virtual-display",
+        "type": "path"
+      },
+      "parent": []
     }
   },
   "root": "root",
