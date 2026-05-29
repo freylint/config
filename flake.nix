@@ -198,6 +198,7 @@
           name = "batpc";
           hwconfig = ./hwdef/batpc.nix;
           deployment.targetHost = "batpc.lan";
+          deployment.allowLocalDeployment = true;
           extraModules = [
             {
               services.xserver.videoDrivers = [ "nvidia" ];
