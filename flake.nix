@@ -125,7 +125,7 @@
         nativeBuildInputs = [ pkgs.elmPackages.elm pkgs.cacert ];
         outputHashAlgo = "sha256";
         outputHashMode = "recursive";
-        outputHash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+        outputHash = "sha256-hS+/mdQ/OKLCysE5jiVPqInz6uJcDW3n4ZnQ1jUjMok=";
         buildPhase = ''
           export ELM_HOME=$out
           mkdir -p $out
@@ -141,9 +141,15 @@
         # npmDepsHash covers TS devDeps: typescript ^5, @types/node ^22, esbuild ^0.24 (elm is NOT an npm dep — provided via ELM_HOME FOD above)
         # Update when npm deps change: nix build .#packages.x86_64-linux.container 2>&1 | grep 'got:'
         #   or: prefetch-npm-deps pkg/www/package-lock.json
-        npmDepsHash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+        npmDepsHash = "sha256-XC3m7o5D+uLbBpAclsY2ThSUY48iSc4+YJN/K1Ho0hw=";
         nativeBuildInputs = [ pkgs.elmPackages.elm ];
-        ELM_HOME = elmHome;
+        # elm writes a lock file to $ELM_HOME/0.19.1/packages/lock — copy to writable TMPDIR
+        preBuild = ''
+          export HOME=$TMPDIR
+          export ELM_HOME=$TMPDIR/elm-home
+          cp -r ${elmHome} $ELM_HOME
+          chmod -R u+w $ELM_HOME
+        '';
         installPhase = ''
           runHook preInstall
           mkdir -p $out
