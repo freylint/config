@@ -7,7 +7,7 @@
 # - firefox: DuckDuckGo, vertical tabs, uBlock Origin, Dark Reader, SponsorBlock, Bitwarden, Catppuccin
 # - gtk: Catppuccin Mocha Mauve GTK theme, Papirus-Dark icons
 # - home_sops: SOPS age key derived from SSH ed25519 key on activation
-# - vscode: extensions, FiraCode, Catppuccin Mocha, SOPS integration, nil Nix LSP, vscodevim
+# - vscode: extensions, FiraCode, Catppuccin Mocha, SOPS integration, nil Nix LSP, vscodevim, elm-ls
 # - home: home-manager module — Firefox, GTK, VS Code, plasma, WezTerm, Zsh, Baloo, games
 # - workstation: workstation role — all NixOS config + home-manager wiring, Docker enabled
 let
@@ -294,6 +294,7 @@ let
               slevesque.shader
               timgjones.hlsltools
               raczzalan.webgl-glsl-editor
+              elm-tooling.elm-ls
             ]);
           userSettings = {
             "editor.fontFamily" = "'FiraCode Nerd Font', monospace";
@@ -305,6 +306,7 @@ let
             "git.confirmSync" = false;
             "nix.enableLanguageServer" = true;
             "nix.serverPath" = "nil";
+            "elmLS.elmPath" = "elm";
             "sops.enabled" = true;
             "sops.creationEnabled" = false;
             "files.associations"."secrets/**/*.yaml" = "yaml";
