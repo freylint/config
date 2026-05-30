@@ -5,6 +5,7 @@
 # - Nix formatter (nixfmt-tree)
 # - virtual-display: local NixOS module sub-flake (pkg/virtual-display) providing AMD virtual display for homebase
 # - virtual-display-vm: QEMU test VM for the virtual-display module (nix run .#vdisp-vm; SSH :2222 root/root)
+# - Per-host targetHost override via COLMENA_HOST_<name> env var (multi-address support; requires --impure)
 {
   description = "NixOS configuration";
 
@@ -85,6 +86,14 @@
           extraModules ? [ ],
         }:
         { ... }:
+        let
+          envHost = builtins.getEnv "COLMENA_HOST_${name}";
+          resolvedDeployment =
+            if deployment.targetHost != null && envHost != "" then
+              deployment // { targetHost = envHost; }
+            else
+              deployment;
+        in
         {
           imports = [
             hwconfig
@@ -94,7 +103,7 @@
           ]
           ++ extraModules;
           networking.hostName = name;
-          inherit deployment;
+          deployment = resolvedDeployment;
         };
 
       amdgpu = {
@@ -134,9 +143,18 @@
         container = pkgs.dockerTools.buildLayeredImage {
           name = "app";
           tag = "latest";
-          contents = with pkgs; [ bashInteractive coreutils nodejs_22 wwwApp dockerTools.fakeNss ];
+          contents = with pkgs; [
+            bashInteractive
+            coreutils
+            nodejs_22
+            wwwApp
+            dockerTools.fakeNss
+          ];
           config = {
-            Cmd = [ "${pkgs.nodejs_22}/bin/node" "${wwwApp}/dist/serve.cjs" ];
+            Cmd = [
+              "${pkgs.nodejs_22}/bin/node"
+              "${wwwApp}/dist/serve.cjs"
+            ];
             ExposedPorts."${toString containerPort}/tcp" = { };
             Env = [ "PORT=${toString containerPort}" ];
           };
@@ -145,14 +163,22 @@
       };
 
       devShells.${system}.default = pkgs.mkShell {
-        packages = with pkgs; [ colmena sops age ssh-to-age ];
+        packages = with pkgs; [
+          colmena
+          sops
+          age
+          ssh-to-age
+        ];
       };
 
       formatter.${system} = pkgs.nixfmt-tree;
 
       nixosConfigurations.virtual-display-vm = nixpkgs.lib.nixosSystem {
         inherit system;
-        modules = [ virtual-display.nixosModules.default ./pkg/virtual-display/vm.nix ];
+        modules = [
+          virtual-display.nixosModules.default
+          ./pkg/virtual-display/vm.nix
+        ];
       };
 
       apps.${system}.vdisp-vm = {
@@ -190,25 +216,34 @@
           };
           extraModules = [
             amdgpu
-            ({ pkgs, ... }: { environment.systemPackages = [ pkgs.moonlight-qt ]; })
+            (
+              { pkgs, ... }:
+              {
+                environment.systemPackages = [ pkgs.moonlight-qt ];
+              }
+            )
           ];
         };
 
         batpc = mkHost {
           name = "batpc";
           hwconfig = ./hwdef/batpc.nix;
-          deployment.targetHost = "batpc.lan";
-          deployment.allowLocalDeployment = true;
+          deployment = {
+            targetHost = "batpc.lan";
+            allowLocalDeployment = true;
+          };
           extraModules = [
             {
               services.xserver.videoDrivers = [ "nvidia" ];
-              hardware.nvidia = {
-                modesetting.enable = true;
-                open = false;
-              };
-              hardware.graphics = {
-                enable = true;
-                enable32Bit = true;
+              hardware = {
+                nvidia = {
+                  modesetting.enable = true;
+                  open = false;
+                };
+                graphics = {
+                  enable = true;
+                  enable32Bit = true;
+                };
               };
             }
           ];
@@ -217,12 +252,12 @@
         homebase = mkHost {
           name = "homebase";
           hwconfig = ./hwdef/homebase.nix;
-          deployment.targetHost = "homebase.freyground.com";
+          deployment = { targetHost = "homebase.freyground.com"; };
           extraModules = [
             amdgpu
             virtual-display.nixosModules.default
             (
-              { ... }:
+              _:
               let
                 displayTimeoutMs = 600000;
               in

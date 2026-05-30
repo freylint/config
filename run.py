@@ -9,6 +9,7 @@ Features:
   - Targets: deploy, deploy-hosts, deploy-local, collar, lightsail, rekey,
              flake-update, lock, unlock, ss-dev, vdisp-test, vdisp-vm
   - Deploy pipeline: WoL, hwdef, flake update, fmt, colmena apply
+  - Multi-address resolution per host: first reachable address selected at deploy time
   - AWS Lightsail container build and deploy (nix build → docker load → push → deploy)
   - SOPS secret rekeying
   - Interactive curses TUI with keyboard navigation
@@ -28,28 +29,17 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
 
-# ---------------------------------------------------------------------------
-# Paths
-# ---------------------------------------------------------------------------
-
 REPO = Path(__file__).parent
 NIXOS = REPO
 COLLAR = REPO / "pkg" / "collar"
 
-# ---------------------------------------------------------------------------
-# Host inventory
-# ---------------------------------------------------------------------------
-
 HOSTS: dict[str, dict] = {
     # mac: set to "aa:bb:cc:dd:ee:ff" to enable Wake-on-LAN; None disables WoL
-    "glw": {"host": "glw.lan", "user": "gen", "mac": None},
-    "batpc": {"host": "batpc.lan", "user": "bat", "mac": None},
-    "homebase": {"host": "homebase.freyground.com", "user": "gen", "mac": None},
+    # hosts: list of addresses tried in order; first reachable one is used
+    "glw":      {"hosts": ["glw.lan"],                 "user": "gen", "mac": None},
+    "batpc":    {"hosts": ["batpc.lan"],                "user": "bat", "mac": None},
+    "homebase": {"hosts": ["homebase.freyground.com"],  "user": "gen", "mac": None},
 }
-
-# ---------------------------------------------------------------------------
-# Target definition
-# ---------------------------------------------------------------------------
 
 
 @dataclass
@@ -58,13 +48,10 @@ class Target:
     description: str
     _cmd: list[str] | Callable[[], list[str]] | None = field(repr=False)
 
-    def build_cmd(self) -> list[str] | None:
-        return self._cmd() if callable(self._cmd) else self._cmd
-
 
 TARGETS: list[Target] = [
     Target("deploy",       "Full deploy: hwdef → update → fmt → colmena all", None),
-    Target("deploy-hosts", "Deploy to HOSTS (comma-separated env var)",                     None),
+    Target("deploy-hosts", "Deploy to DEPLOY_HOSTS (comma-separated env var)",               None),
     Target("deploy-local", "Apply config to local machine via colmena apply-local",         None),
     Target("collar",       "Build collar embedded firmware via nix",                         None),
     Target("lightsail",    "Build container and deploy to AWS Lightsail (set LIGHTSAIL_SERVICE)", None),
@@ -76,12 +63,6 @@ TARGETS: list[Target] = [
     Target("vdisp-test",   "Check virtual display service and DRM state on homebase",        None),
     Target("vdisp-vm",     "Build and run virtual-display test VM (SSH :2222 root/root)",    None),
 ]
-
-_TARGET_MAP: dict[str, Target] = {t.name: t for t in TARGETS}
-
-# ---------------------------------------------------------------------------
-# Low-level helpers
-# ---------------------------------------------------------------------------
 
 
 def _run(
@@ -118,39 +99,44 @@ def _wake(mac: str) -> None:
         s.sendto(b"\xff" * 6 + mac_bytes * 16, ("<broadcast>", 9))
 
 
-def _wait_online(host: str, timeout: int = 60) -> bool:
+def _wait_online(hosts: list[str], timeout: int = 60) -> bool:
     deadline = time.time() + timeout
     while time.time() < deadline:
-        if _capture(["ping", "-c1", "-W1", host]).returncode == 0:
+        if any(_capture(["ping", "-c1", "-W1", h]).returncode == 0 for h in hosts):
             return True
         time.sleep(2)
     return False
+
+
+def _resolve_host(name: str, hosts: list[str]) -> str:
+    """Return the first reachable address, or the first entry (with a warning) if none respond."""
+    for h in hosts:
+        if _capture(["ping", "-c1", "-W1", h]).returncode == 0:
+            return h
+    print(f"  WARNING: no address responded for {name}, falling back to {hosts[0]}", file=sys.stderr)
+    return hosts[0]
 
 
 def _wake_hosts(targets: dict[str, dict]) -> int:
     for name, info in targets.items():
         if not (mac := info.get("mac")):
             continue
-        if _capture(["ping", "-c1", "-W1", info["host"]]).returncode == 0:
+        if any(_capture(["ping", "-c1", "-W1", h]).returncode == 0 for h in info["hosts"]):
             continue
         print(f"  waking {name}")
         _wake(mac)
         print(f"  waiting for {name}", end="", flush=True)
-        if _wait_online(info["host"]):
+        if _wait_online(info["hosts"]):
             print(" online")
         else:
             print(f"\n  WARNING: {name} did not come online", file=sys.stderr)
     return 0
 
-# ---------------------------------------------------------------------------
-# Deploy pipeline steps
-# ---------------------------------------------------------------------------
 
-
-def _update_hwdef(name: str, info: dict) -> bool:
+def _update_hwdef(name: str, info: dict, host: str) -> bool:
     """Fetch hardware config from host via SSH. Returns True on success."""
-    print(f"  hwdef: {name}")
-    result = _capture(["ssh", f"{info['user']}@{info['host']}",
+    print(f"  hwdef: {name} ({host})")
+    result = _capture(["ssh", f"{info['user']}@{host}",
                         "sudo nixos-generate-config --show-hardware-config"])
     if result.returncode != 0:
         print(f"  WARNING: hwdef failed for {name}: {result.stderr.strip()}", file=sys.stderr)
@@ -171,34 +157,48 @@ def _fmt() -> int:
     return _run(["nix", "fmt", "."], cwd=NIXOS)
 
 
-def _colmena(on: list[str] | None = None) -> int:
+def _colmena(on: list[str] | None = None, extra_env: dict[str, str] | None = None) -> int:
     cmd = ["colmena", "apply", "--impure"]
     cmd += ["--on", ",".join(on)] if on else ["--keep-going"]
-    return _run(_nixos(*cmd), cwd=NIXOS, extra_env={"NIXPKGS_ALLOW_UNFREE": "1"})
+    env = {"NIXPKGS_ALLOW_UNFREE": "1", **(extra_env or {})}
+    return _run(_nixos(*cmd), cwd=NIXOS, extra_env=env)
 
 
 def _pipeline(on: list[str] | None = None) -> int:
     """Full deploy pipeline for the given hosts (None = all)."""
     targets = {k: v for k, v in HOSTS.items() if on is None or k in on}
 
-    steps: list[tuple[str, Callable[[], int | None]]] = [
-        ("wake",           lambda: _wake_hosts(targets)),
-        ("hwdefs",         lambda: 0 if all(_update_hwdef(n, i) for n, i in targets.items()) else 1),
-        ("flake update",   _flake_update),
-        ("fmt",            _fmt),
-        ("colmena apply",  lambda: _colmena(on)),
-    ]
-    for label, step in steps:
-        print(f"\n→ {label}")
-        rc = step()
-        if rc:
-            print(f"  step failed (exit {rc})", file=sys.stderr)
-            return rc
-    return 0
+    print("\n→ wake")
+    if rc := _wake_hosts(targets):
+        print(f"  step failed (exit {rc})", file=sys.stderr)
+        return rc
 
-# ---------------------------------------------------------------------------
-# Lightsail pipeline
-# ---------------------------------------------------------------------------
+    # Resolve after WoL so sleeping hosts are online before address selection.
+    # Keys must match colmena attribute names exactly; null-targetHost hosts ignore it via Nix guard.
+    print("\n→ resolve")
+    resolved = {n: _resolve_host(n, info["hosts"]) for n, info in targets.items()}
+    host_env = {f"COLMENA_HOST_{n}": h for n, h in resolved.items()}
+
+    print("\n→ hwdefs")
+    for n in targets:  # non-fatal: sudo/TTY may be unavailable
+        _update_hwdef(n, targets[n], resolved[n])
+
+    print("\n→ flake update")
+    if rc := _flake_update():
+        print(f"  step failed (exit {rc})", file=sys.stderr)
+        return rc
+
+    print("\n→ fmt")
+    if rc := _fmt():
+        print(f"  step failed (exit {rc})", file=sys.stderr)
+        return rc
+
+    print("\n→ colmena apply")
+    if rc := _colmena(on, extra_env=host_env):
+        print(f"  step failed (exit {rc})", file=sys.stderr)
+        return rc
+
+    return 0
 
 
 def _lightsail() -> int:
@@ -252,10 +252,6 @@ def _lightsail() -> int:
                  "--containers", containers,
                  "--public-endpoint", endpoint])
 
-# ---------------------------------------------------------------------------
-# Sops rekey
-# ---------------------------------------------------------------------------
-
 
 def _rekey() -> int:
     """Re-encrypt all sops secret files using current .sops.yaml key config."""
@@ -272,14 +268,9 @@ def _rekey() -> int:
     return rc
 
 
-# ---------------------------------------------------------------------------
-# Virtual display diagnostics
-# ---------------------------------------------------------------------------
-
-
 def _vdisp_test() -> int:
     info = HOSTS["homebase"]
-    host, user = info["host"], info["user"]
+    host, user = _resolve_host("homebase", info["hosts"]), info["user"]
     diag = (
         "echo '=== DRM connectors ==='; "
         "for f in /sys/class/drm/*/status; do "
@@ -297,17 +288,12 @@ def _vdisp_test() -> int:
     return _run(["ssh", f"{user}@{host}", diag])
 
 
-# ---------------------------------------------------------------------------
-# Target dispatch
-# ---------------------------------------------------------------------------
-
-
 def run_target(target: Target) -> int:
     match target.name:
         case "deploy":
             return _pipeline()
         case "deploy-hosts":
-            hosts = [h.strip() for h in os.environ.get("HOSTS", "").split(",") if h.strip()]
+            hosts = [h.strip() for h in os.environ.get("DEPLOY_HOSTS", "").split(",") if h.strip()]
             return _pipeline(on=hosts or None)
         case "deploy-local":
             return _run(
@@ -333,15 +319,11 @@ def run_target(target: Target) -> int:
         case "vdisp-vm":
             return _run(["nix", "run", "--impure", f"{NIXOS}#vdisp-vm"])
         case _:
-            cmd = target.build_cmd()
+            cmd = target._cmd() if callable(target._cmd) else target._cmd
             if cmd is None:
                 print(f"error: no command defined for {target.name!r}", file=sys.stderr)
                 return 1
             return _run(cmd)
-
-# ---------------------------------------------------------------------------
-# TUI
-# ---------------------------------------------------------------------------
 
 
 def _draw(stdscr: curses.window, selected: int) -> None:
@@ -389,19 +371,15 @@ def interactive() -> int:
     print(f"\n→ {target.name}: {target.description}\n")
     return run_target(target)
 
-# ---------------------------------------------------------------------------
-# Entry point
-# ---------------------------------------------------------------------------
-
 
 def main() -> None:
     if len(sys.argv) > 1:
         name = sys.argv[1]
-        if name not in _TARGET_MAP:
-            names = ", ".join(_TARGET_MAP)
-            print(f"Unknown target {name!r}. Available: {names}", file=sys.stderr)
+        target_map = {t.name: t for t in TARGETS}
+        if name not in target_map:
+            print(f"Unknown target {name!r}. Available: {', '.join(target_map)}", file=sys.stderr)
             sys.exit(1)
-        sys.exit(run_target(_TARGET_MAP[name]))
+        sys.exit(run_target(target_map[name]))
     else:
         sys.exit(interactive())
 

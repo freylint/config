@@ -442,4 +442,6 @@ let
       system.stateVersion = "25.11";
     };
 in
-{ inherit workstation; }
+{
+  inherit workstation;
+}

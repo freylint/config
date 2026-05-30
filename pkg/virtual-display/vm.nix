@@ -17,7 +17,13 @@
     cores = 2;
     memorySize = 1024;
     graphics = false;
-    forwardPorts = [ { from = "host"; host.port = 2222; guest.port = 22; } ];
+    forwardPorts = [
+      {
+        from = "host";
+        host.port = 2222;
+        guest.port = 22;
+      }
+    ];
   };
 
   services.openssh = {
