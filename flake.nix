@@ -279,7 +279,7 @@
         homebase = mkHost {
           name = "homebase";
           hwconfig = ./hwdef/homebase.nix;
-          deployment = { targetHost = "homebase.freyground.com"; };
+          deployment = { targetHost = "homebase.freyground.com"; allowLocalDeployment = true; };
           extraModules = [
             amdgpu
             virtual-display.nixosModules.default
