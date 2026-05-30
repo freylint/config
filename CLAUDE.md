@@ -19,15 +19,6 @@ Every file must have a header comment listing its features/responsibilities. Kee
 
 ## Multi-agent review on every feature
 
-### Steering quorum (runs first)
-
-Before the refactoring quorum, spawn four agents to assess the change and produce a written directive. Each reads the diff and affected files, then states its position. Together they output a single steering brief — risks to watch, scope to cover, tradeoffs to resolve — that is passed verbatim to the refactoring quorum below.
-
-- **CTO** — strategic coherence: does this fit the architecture vision, introduce unwanted coupling, or drift from the long-term direction? Flags decisions that look fine locally but create problems at scale
-- **HR Director** — team and process standards: are conventions followed consistently, is the change reviewable and maintainable by someone who wasn't in this session, does it leave the codebase in a state a new contributor could navigate?
-- **Technical Lead** — day-to-day correctness: owns the implementation details, checks for edge cases, integration risk, and whether the approach matches how the rest of the codebase actually works
-- **Grizzled Veteran** — hard-won instinct: "we tried that and it burned us" — surfaces hidden risk, fragile assumptions, and patterns that look clever but rot in production
-
 After all four state their position, synthesise into a steering brief (≤10 bullets) and hand it to the refactoring quorum.
 
 ### Refactoring quorum (runs after steering brief is ready)
