@@ -1,7 +1,7 @@
 # Features:
 # - overlays: NUR, rust-overlay, nix-vscode-extensions overlays; unfree allowed
 # - desktop: KDE Plasma 6, SDDM Wayland, ksshaskpass, excluded KDE packages
-# - packages: system packages — dev, infra (nil LSP, awscli2), eda, desktop groups
+# - packages: system packages — dev (elm, rust), infra (nil LSP, awscli2), eda, desktop groups
 # - wake_on_lan: WoL (magic packet) on all physical Ethernet interfaces at boot
 # - users: normal users with wheel/networkmanager groups and admin SSH keys
 # - firefox: DuckDuckGo, vertical tabs, uBlock Origin, Dark Reader, SponsorBlock, Bitwarden, Catppuccin
@@ -100,6 +100,8 @@ let
             "rust-analyzer"
           ];
         })
+        elmPackages.elm
+        elmPackages.elm-format
         # infra
         colmena
         claude-code
@@ -289,13 +291,13 @@ let
               ms-vscode-remote.remote-ssh
               signageos.signageos-vscode-sops
               vscodevim.vim
+              elmtooling.elm-ls-vscode
             ])
             ++ (with pkgs.vscode-marketplace; [
               slevesque.shader
               timgjones.hlsltools
               raczzalan.webgl-glsl-editor
-            ])
-            ++ [ pkgs.vscode-marketplace.elmtooling.elm-ls-vscode ];
+            ]);
           userSettings = {
             "editor.fontFamily" = "'FiraCode Nerd Font', monospace";
             "editor.fontLigatures" = true;
@@ -307,6 +309,7 @@ let
             "nix.enableLanguageServer" = true;
             "nix.serverPath" = "nil";
             "elmLS.elmPath" = "elm";
+            "elmLS.elmFormatPath" = "elm-format";
             "sops.enabled" = true;
             "sops.creationEnabled" = false;
             "files.associations"."secrets/**/*.yaml" = "yaml";
