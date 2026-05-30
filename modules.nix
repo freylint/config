@@ -294,8 +294,8 @@ let
               slevesque.shader
               timgjones.hlsltools
               raczzalan.webgl-glsl-editor
-              "elm-tooling".elm-ls
-            ]);
+            ])
+            ++ [ pkgs.vscode-marketplace."elm-tooling".elm-ls ];
           userSettings = {
             "editor.fontFamily" = "'FiraCode Nerd Font', monospace";
             "editor.fontLigatures" = true;
