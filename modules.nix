@@ -295,7 +295,7 @@ let
               timgjones.hlsltools
               raczzalan.webgl-glsl-editor
             ])
-            ++ [ pkgs.vscode-marketplace."elm-tooling".elm-ls ];
+            ++ [ pkgs.vscode-marketplace.elmtooling.elm-ls ];
           userSettings = {
             "editor.fontFamily" = "'FiraCode Nerd Font', monospace";
             "editor.fontLigatures" = true;
