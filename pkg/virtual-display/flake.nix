@@ -6,7 +6,12 @@
   description = "AMD virtual display NixOS module for headless Wayland sessions";
   outputs = _: {
     nixosModules.default =
-      { config, pkgs, lib, ... }:
+      {
+        config,
+        pkgs,
+        lib,
+        ...
+      }:
       let
         cfg = config.services.virtualDisplay;
         inherit (lib)
