@@ -247,7 +247,7 @@ def _lightsail() -> int:
     })
 
     print(f"→ lightsail create-container-service-deployment ({image_ref})")
-    return _run(["aws", "lightsail", "create-container-service-deployment",
+    return _run(["aws", "--no-cli-pager", "lightsail", "create-container-service-deployment",
                  "--service-name", service,
                  "--containers", containers,
                  "--public-endpoint", endpoint])
