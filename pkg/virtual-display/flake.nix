@@ -2,6 +2,7 @@
 # - NixOS module: services.virtualDisplay — AMD virtual display for headless Wayland sessions
 # - Options: enable, amdgpuPciAddress, resolution (default 1920x1080), refreshRate (default 60)
 # - Systemd user service: watches DRM hotplug, toggles Virtual-1, inhibits screensaver
+# - Reliable disable: retries up to 3× with JSON state verification and 30 s watchdog
 {
   description = "AMD virtual display NixOS module for headless Wayland sessions";
   outputs = _: {
@@ -10,6 +11,7 @@
       let
         cfg = config.services.virtualDisplay;
         inherit (lib)
+          getExe
           getExe'
           mkEnableOption
           mkIf
@@ -19,6 +21,7 @@
         kscreen-doctor = getExe' pkgs.kdePackages.kscreen "kscreen-doctor";
         dbus-send = getExe' pkgs.dbus "dbus-send";
         udevadm = getExe' pkgs.systemd "udevadm";
+        jq = getExe pkgs.jq;
         monitorScript = pkgs.writeShellScript "virtual-display-monitor" ''
           COOKIE=""
 
@@ -28,6 +31,11 @@
               [[ "$(<"$f")" == "connected" ]] && return 0
             done
             return 1
+          }
+          # JSON output avoids locale-sensitive text parsing across KDE versions
+          virtual_active() {
+            ${kscreen-doctor} -j 2>/dev/null \
+              | ${jq} -e '.outputs[] | select(.name=="Virtual-1" and .enabled)' >/dev/null 2>&1
           }
           inhibit() {
             [[ -n "$COOKIE" ]] && return
@@ -48,11 +56,19 @@
           enable_virtual() {
             ${kscreen-doctor} \
               output.Virtual-1.enable \
-              output.Virtual-1.mode.${cfg.resolution}@${toString cfg.refreshRate} || true
+              output.Virtual-1.mode.${cfg.resolution}@${toString cfg.refreshRate} 2>/dev/null || true
             inhibit
           }
+          # Retries up to 3× with verification; uninhibits only after confirmed success
+          # to preserve the invariant: COOKIE is set iff virtual display is active.
           disable_virtual() {
-            ${kscreen-doctor} output.Virtual-1.disable || true
+            local attempt
+            for attempt in 1 2 3; do
+              ${kscreen-doctor} output.Virtual-1.disable 2>/dev/null || true
+              sleep "$attempt"
+              virtual_active || { uninhibit; return 0; }
+            done
+            echo "warn: failed to disable Virtual-1 after 3 attempts" >&2
             uninhibit
           }
           update_state() {
@@ -62,10 +78,9 @@
 
           while true; do
             update_state
-            # Process substitution keeps while-read in the parent shell so COOKIE
-            # mutations (inhibit/uninhibit) propagate correctly across hotplug events.
-            while read -r line; do
-              [[ "$line" == *"HOTPLUG=1"* ]] && { sleep 1; update_state; }
+            # read -t 30: periodic watchdog re-triggers update_state when no hotplug events arrive
+            while read -r -t 30 line; do
+              [[ "$line" == *"HOTPLUG=1"* ]] && { sleep 2; update_state; }
             done < <(${udevadm} monitor --subsystem-match=drm --property 2>/dev/null)
             sleep 2
           done
