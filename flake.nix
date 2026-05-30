@@ -1,7 +1,7 @@
 # Features:
 # - Three NixOS hosts: glw (local), batpc, homebase — deployed via colmena
 # - Dev shell with colmena, sops, age, ssh-to-age
-# - Docker container image (Node.js www SPA; TypeScript+Mithril bundled via buildNpmPackage, port 8080)
+# - Docker container image (Node.js www SPA; Elm bundled via elm make + buildNpmPackage, port 8080)
 # - Nix formatter (nixfmt-tree)
 # - virtual-display: local NixOS module sub-flake (pkg/virtual-display) providing AMD virtual display for homebase
 # - virtual-display-vm: QEMU test VM for the virtual-display module (nix run .#vdisp-vm; SSH :2222 root/root)
@@ -116,13 +116,34 @@
 
       vdispVm = self.nixosConfigurations.virtual-display-vm.config.system.build.vm;
       containerPort = 8080; # Lightsail LB terminates TLS; container speaks plain HTTP
+      # Fixed-output derivation: fetches elm packages (elm/browser, elm/core, elm/html + transitive deps).
+      # Network access is allowed for FODs. Rebuild and update hash when elm.json deps change:
+      #   nix build .#packages.x86_64-linux.container 2>&1 | grep 'got:'
+      elmHome = pkgs.stdenv.mkDerivation {
+        name = "www-elm-home";
+        src = ./pkg/www;
+        nativeBuildInputs = [ pkgs.elmPackages.elm pkgs.cacert ];
+        outputHashAlgo = "sha256";
+        outputHashMode = "recursive";
+        outputHash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+        buildPhase = ''
+          export ELM_HOME=$out
+          mkdir -p $out
+          elm make src/Main.elm --output=/dev/null
+        '';
+        dontInstall = true;
+      };
       # $out/dist/{bundle.js,serve.cjs} + $out/index.html — __dirname in serve.ts resolves to $out/dist/
       wwwBundle = pkgs.buildNpmPackage {
         pname = "www";
         version = "0.1.0";
         src = ./pkg/www;
-        # npmDepsHash covers TS devDeps: typescript ^5, @types/mithril ^2, @types/node ^22 — rebump when these change
-        npmDepsHash = "sha256-XC3m7o5D+uLbBpAclsY2ThSUY48iSc4+YJN/K1Ho0hw=";
+        # npmDepsHash covers TS devDeps: typescript ^5, @types/node ^22, esbuild ^0.24 (elm is NOT an npm dep — provided via ELM_HOME FOD above)
+        # Update when npm deps change: nix build .#packages.x86_64-linux.container 2>&1 | grep 'got:'
+        #   or: prefetch-npm-deps pkg/www/package-lock.json
+        npmDepsHash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+        nativeBuildInputs = [ pkgs.elmPackages.elm ];
+        ELM_HOME = elmHome;
         installPhase = ''
           runHook preInstall
           mkdir -p $out

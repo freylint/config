@@ -6,6 +6,8 @@
     <title>www</title>
   </head>
   <body>
+    <div id="app"></div>
     <script src="dist/bundle.js"></script>
+    <script>Elm.Main.init({ node: document.getElementById('app') })</script>
   </body>
 </html>
