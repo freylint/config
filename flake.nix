@@ -282,21 +282,20 @@
           deployment = { targetHost = "homebase.freyground.com"; allowLocalDeployment = true; };
           extraModules = [
             amdgpu
-            # virtual-display.nixosModules.default
+            virtual-display.nixosModules.default
             (
               { pkgs, ... }:
               let
                 displayTimeoutMs = 600000;
               in
               {
-                # 6.18.33 hangs on boot with amdgpu.virtual_display; glw (AMD, no vdisp) boots clean
                 boot.kernelPackages = pkgs.linuxPackages_zen;
 
                 services = {
-                  #virtualDisplay = {
-                  #  enable = true;
-                  #  amdgpuPciAddress = "0000:03:00.0";
-                  #};
+                  virtualDisplay = {
+                    enable = true;
+                    amdgpuPciAddress = "0000:03:00.0";
+                  };
                   fwupd.enable = false;
                   sunshine = {
                     enable = true;
