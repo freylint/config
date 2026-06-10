@@ -7,7 +7,7 @@ Task runner — interactive TUI or direct execution.
 
 Features:
   - Targets: deploy, deploy-hosts, deploy-local, collar, lightsail, rekey,
-             flake-update, lock, unlock, ss-dev, vdisp-test, vdisp-vm
+             update, flake-update, lock, unlock, ss-dev, vdisp-test, vdisp-vm
   - Deploy pipeline: WoL, hwdef, flake update, fmt, colmena apply
   - Multi-address resolution per host: first reachable address selected at deploy time
   - AWS Lightsail container build and deploy (nix build → docker load → push → deploy)
@@ -58,6 +58,7 @@ TARGETS: list[Target] = [
     Target("rekey",        "Re-encrypt all sops secrets for current key set",                    None),
     Target("lock",         "Lock the display session",   lambda: ["loginctl", "lock-session",   _session()]),
     Target("unlock",       "Unlock the display session", lambda: ["loginctl", "unlock-session", _session()]),
+    Target("update",       "Update flake inputs and reformat (UPDATE_INPUT=<name> for one)",  None),
     Target("flake-update", "Update flake.lock (nix flake update)",                           None),
     Target("ss-dev",       "Screensaver dev cycle: unlock → wait 5s → lock",                None),
     Target("vdisp-test",   "Check virtual display service and DRM state on homebase",        None),
@@ -147,9 +148,10 @@ def _update_hwdef(name: str, info: dict, host: str) -> bool:
     return True
 
 
-def _flake_update() -> int:
-    print("  nix flake update")
-    return _run(["nix", "flake", "update"], cwd=NIXOS)
+def _flake_update(input: str | None = None) -> int:
+    cmd = ["nix", "flake", "update"] + ([input] if input else [])
+    print(f"  {' '.join(cmd)}")
+    return _run(cmd, cwd=NIXOS)
 
 
 def _fmt() -> int:
@@ -305,6 +307,10 @@ def run_target(target: Target) -> int:
             return _run(["nix", "build", ".#default"], cwd=COLLAR)
         case "lightsail":
             return _lightsail()
+        case "update":
+            if rc := _flake_update(os.environ.get("UPDATE_INPUT") or None):
+                return rc
+            return _fmt()
         case "flake-update":
             return _flake_update()
         case "rekey":

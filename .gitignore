@@ -18,5 +18,9 @@ Cargo.lock
 node_modules/
 dist/
 
+# Python
+*.pyc
+__pycache__/
+
 # Build artifacts
 **/result

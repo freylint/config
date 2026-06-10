@@ -16,7 +16,10 @@
     in
     {
       devShells.${system}.default = pkgs.mkShell {
-        packages = [ pkgs.nodejs_22 pkgs.elmPackages.elm ];
+        packages = [
+          pkgs.nodejs_22
+          pkgs.elmPackages.elm
+        ];
       };
     };
 }

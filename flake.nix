@@ -125,7 +125,10 @@
       elmHome = pkgs.stdenv.mkDerivation {
         name = "www-elm-home";
         src = ./pkg/www;
-        nativeBuildInputs = [ pkgs.elmPackages.elm pkgs.cacert ];
+        nativeBuildInputs = [
+          pkgs.elmPackages.elm
+          pkgs.cacert
+        ];
         outputHashAlgo = "sha256";
         outputHashMode = "recursive";
         outputHash = "sha256-hS+/mdQ/OKLCysE5jiVPqInz6uJcDW3n4ZnQ1jUjMok=";
@@ -254,14 +257,15 @@
             )
           ];
         };
-             
+
         batpc = mkHost {
-           name = "batpc";
+          name = "batpc";
           # Prefer an existing local hardware configuration on the host itself.
-          hwconfig = if builtins.pathExists /etc/nixos/hardware-configuration.nix then
-            /etc/nixos/hardware-configuration.nix
-          else
-            ./hwdef/batpc.nix;
+          hwconfig =
+            if builtins.pathExists /etc/nixos/hardware-configuration.nix then
+              /etc/nixos/hardware-configuration.nix
+            else
+              ./hwdef/batpc.nix;
           deployment = {
             targetHost = "batpc.lan";
             allowLocalDeployment = true;
@@ -287,7 +291,10 @@
         homebase = mkHost {
           name = "homebase";
           hwconfig = ./hwdef/homebase.nix;
-          deployment = { targetHost = "homebase.freyground.com"; allowLocalDeployment = true; };
+          deployment = {
+            targetHost = "homebase.freyground.com";
+            allowLocalDeployment = true;
+          };
           extraModules = [
             amdgpu
             # virtual-display.nixosModules.default
