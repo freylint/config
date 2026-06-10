@@ -1,6 +1,6 @@
 # Features:
 # - Three NixOS hosts: glw (local), batpc, homebase — deployed via colmena
-# - amdgpu: Mesa built with clang + ThinLTO + ndebug (CachyOS-style optimizations)
+# - cachyMesaOverlay: Mesa built with clang + ThinLTO + ndebug + x86-64-v3 (CachyOS-style); shared by amdgpu and intel modules
 # - Dev shell with colmena, sops, age, ssh-to-age
 # - Docker container image (Node.js www SPA; Elm bundled via elm make + buildNpmPackage, port 8080)
 # - Nix formatter (nixfmt-tree)
@@ -108,22 +108,31 @@
           deployment = resolvedDeployment;
         };
 
+      cachyMesaOverlay = final: prev: {
+        mesa = (prev.mesa.override {
+          stdenv = final.llvmPackages_latest.stdenv;
+        }).overrideAttrs (old: {
+          NIX_CFLAGS_COMPILE = toString (old.NIX_CFLAGS_COMPILE or "") + " -march=x86-64-v3";
+          mesonFlags = old.mesonFlags ++ [
+            "-Db_lto=true"
+            "-Db_lto_mode=thin"
+            "-Db_ndebug=true"
+          ];
+        });
+      };
+
       amdgpu = {
-        nixpkgs.overlays = [
-          (final: prev: {
-            mesa = (prev.mesa.override {
-              stdenv = final.llvmPackages_latest.stdenv;
-            }).overrideAttrs (old: {
-              NIX_CFLAGS_COMPILE = toString (old.NIX_CFLAGS_COMPILE or "") + " -march=x86-64-v3";
-              mesonFlags = old.mesonFlags ++ [
-                "-Db_lto=true"
-                "-Db_lto_mode=thin"
-                "-Db_ndebug=true"
-              ];
-            });
-          })
-        ];
+        nixpkgs.overlays = [ cachyMesaOverlay ];
         services.xserver.videoDrivers = [ "amdgpu" ];
+        hardware.graphics = {
+          enable = true;
+          enable32Bit = true;
+        };
+      };
+
+      intel = {
+        nixpkgs.overlays = [ cachyMesaOverlay ];
+        services.xserver.videoDrivers = [ "modesetting" ];
         hardware.graphics = {
           enable = true;
           enable32Bit = true;
@@ -263,7 +272,7 @@
             allowLocalDeployment = true;
           };
           extraModules = [
-            amdgpu
+            intel
             (
               { pkgs, ... }:
               {
