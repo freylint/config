@@ -432,7 +432,7 @@ let
       home-manager = {
         useGlobalPkgs = true;
         useUserPackages = true;
-        backupFileExtension = "backup";
+        backupCommand = "mv \"$1\" \"$1.$(date +%Y%m%dT%H%M%S).bak\"";
         sharedModules = [
           plasma-manager.homeModules.plasma-manager
           nixos-vscode-server.homeModules.default
