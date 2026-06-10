@@ -1,5 +1,5 @@
 # Features:
-# - Three NixOS hosts: glw (local), batpc, homebase — deployed via colmena; glw has karousel KWin script
+# - Three NixOS hosts: glw (local), batpc, homebase — deployed via colmena
 # - Dev shell with colmena, sops, age, ssh-to-age
 # - Docker container image (Node.js www SPA; Elm bundled via elm make + buildNpmPackage, port 8080)
 # - Nix formatter (nixfmt-tree)
@@ -248,27 +248,8 @@
             amdgpu
             (
               { pkgs, ... }:
-              let
-                karousel = pkgs.stdenv.mkDerivation {
-                  pname = "karousel";
-                  version = "0.17";
-                  src = pkgs.fetchurl {
-                    url = "https://github.com/peterfajdiga/karousel/releases/download/v0.17/karousel_0_17.tar.gz";
-                    hash = "sha256-SS4pYtwOUQ5HeaDu38KqMRwu4+S2YhZI6uYO2+ML0cM=";
-                  };
-                  dontBuild = true;
-                  installPhase = ''
-                    mkdir -p $out/share/kwin/scripts/karousel
-                    cp -r . $out/share/kwin/scripts/karousel/
-                  '';
-                };
-              in
               {
                 environment.systemPackages = [ pkgs.moonlight-qt ];
-                home-manager.users.gen = {
-                  home.packages = [ karousel ];
-                  programs.plasma.configFile."kwinrc".Plugins.karouselEnabled = true;
-                };
               }
             )
           ];
