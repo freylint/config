@@ -3,7 +3,9 @@
 # - desktop: KDE Plasma 6, SDDM Wayland, ksshaskpass, excluded KDE packages
 # - packages: system packages — dev (elm, rust), infra (nil LSP, awscli2), eda, desktop groups
 # - wake_on_lan: WoL (magic packet) on all physical Ethernet interfaces at boot
-# - users: normal users with wheel/networkmanager groups and admin SSH keys
+# - controllers: udev + Steam Input — steam-hardware, xone, xpadneo, gamescope session,
+#                game-devices-udev-rules, antimicrox/jstest-gtk/linuxConsoleTools/evtest
+# - users: normal users with wheel/networkmanager/docker/input groups and admin SSH keys
 # - firefox: DuckDuckGo, vertical tabs, uBlock Origin, Dark Reader, SponsorBlock, Bitwarden, Catppuccin
 # - gtk: Catppuccin Mocha Mauve GTK theme, Papirus-Dark icons
 # - home_sops: SOPS age key derived from SSH ed25519 key on activation
@@ -149,6 +151,32 @@ let
       };
     };
 
+  controllers =
+    { pkgs, ... }:
+    {
+      # Built-in udev + kmod stack: steam-hardware covers Valve, DualShock 4/5,
+      # DualSense, Switch Pro, Wii, and generic HID gamepads via uaccess.
+      hardware = {
+        steam-hardware.enable = true;
+        xone.enable = true;     # wired Xbox One / Series + dongle (out-of-tree kmod)
+        xpadneo.enable = true;  # Bluetooth Xbox controllers
+      };
+      # extest exposes Steam Input as XInput so non-Steam apps see remapped controllers.
+      # gamescopeSession adds a dedicated compositor session for handheld-style play.
+      programs.steam = {
+        extest.enable = true;
+        gamescopeSession.enable = true;
+      };
+      # Extra vendor rules: 8BitDo, Stadia, Razer, Switch joycond, evhz, etc.
+      services.udev.packages = [ pkgs.game-devices-udev-rules ];
+      environment.systemPackages = with pkgs; [
+        antimicrox
+        jstest-gtk
+        linuxConsoleTools
+        evtest
+      ];
+    };
+
   users =
     {
       lib,
@@ -165,6 +193,7 @@ let
           "networkmanager"
           "wheel"
           "docker"
+          "input"
         ];
         shell = pkgs.zsh;
         openssh.authorizedKeys.keys = adminKeys;
@@ -391,6 +420,7 @@ let
         desktop
         packages
         wake_on_lan
+        controllers
         users
         # virtual-display moved to pkg/virtual-display/ (standalone flake, imported by flake.nix)
       ];
