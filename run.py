@@ -161,7 +161,8 @@ def _fmt() -> int:
 
 def _colmena(on: list[str] | None = None, extra_env: dict[str, str] | None = None) -> int:
     cmd = ["colmena", "apply", "--impure"]
-    cmd += ["--on", ",".join(on)] if on else ["--keep-going"]
+    if on:
+        cmd += ["--on", ",".join(on)]
     env = {"NIXPKGS_ALLOW_UNFREE": "1", **(extra_env or {})}
     return _run(_nixos(*cmd), cwd=NIXOS, extra_env=env)
 

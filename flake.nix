@@ -10,9 +10,9 @@
   description = "NixOS configuration";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
     home-manager = {
-      url = "github:nix-community/home-manager/release-25.11";
+      url = "github:nix-community/home-manager/release-26.05";
       inputs.nixpkgs.follows = "nixpkgs";
     };
     nix-vscode-extensions = {
@@ -207,8 +207,8 @@
       formatter.${system} = pkgs.nixfmt-tree;
 
       nixosConfigurations.virtual-display-vm = nixpkgs.lib.nixosSystem {
-        inherit system;
         modules = [
+          { nixpkgs.hostPlatform = system; }
           virtual-display.nixosModules.default
           ./pkg/virtual-display/vm.nix
         ];

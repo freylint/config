@@ -158,8 +158,8 @@ let
       # DualSense, Switch Pro, Wii, and generic HID gamepads via uaccess.
       hardware = {
         steam-hardware.enable = true;
-        xone.enable = true;     # wired Xbox One / Series + dongle (out-of-tree kmod)
-        xpadneo.enable = true;  # Bluetooth Xbox controllers
+        xone.enable = true; # wired Xbox One / Series + dongle (out-of-tree kmod)
+        xpadneo.enable = true; # Bluetooth Xbox controllers
       };
       # extest exposes Steam Input as XInput so non-Steam apps see remapped controllers.
       # gamescopeSession adds a dedicated compositor session for handheld-style play.
