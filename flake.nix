@@ -40,6 +40,7 @@
       url = "github:Mic92/sops-nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
     # Local sub-flake (pkg/virtual-display) consumed as a NixOS module only.
     # Has no external inputs, so no `inputs.nixpkgs.follows` is needed.
     # `path:` inputs carry no narHash in the lock; freshness is ensured by `--impure` at deploy time.
@@ -113,6 +114,8 @@
           enable32Bit = true;
         };
       };
+
+      batpcPackages = with pkgs; [ prismlauncher ];
 
       vdispVm = self.nixosConfigurations.virtual-display-vm.config.system.build.vm;
       containerPort = 8080; # Lightsail LB terminates TLS; container speaks plain HTTP
@@ -270,10 +273,14 @@
             )
           ];
         };
-
+             
         batpc = mkHost {
-          name = "batpc";
-          hwconfig = ./hwdef/batpc.nix;
+           name = "batpc";
+          # Prefer an existing local hardware configuration on the host itself.
+          hwconfig = if builtins.pathExists /etc/nixos/hardware-configuration.nix then
+            /etc/nixos/hardware-configuration.nix
+          else
+            ./hwdef/batpc.nix;
           deployment = {
             targetHost = "batpc.lan";
             allowLocalDeployment = true;
@@ -291,6 +298,7 @@
                   enable32Bit = true;
                 };
               };
+              environment.systemPackages = batpcPackages;
             }
           ];
         };
@@ -301,20 +309,21 @@
           deployment = { targetHost = "homebase.freyground.com"; allowLocalDeployment = true; };
           extraModules = [
             amdgpu
-            virtual-display.nixosModules.default
+            # virtual-display.nixosModules.default
             (
               { pkgs, ... }:
               let
                 displayTimeoutMs = 600000;
               in
               {
+                # 6.18.33 hangs on boot with amdgpu.virtual_display; glw (AMD, no vdisp) boots clean
                 boot.kernelPackages = pkgs.linuxPackages_zen;
 
                 services = {
-                  virtualDisplay = {
-                    enable = true;
-                    amdgpuPciAddress = "0000:03:00.0";
-                  };
+                  #virtualDisplay = {
+                  #  enable = true;
+                  #  amdgpuPciAddress = "0000:03:00.0";
+                  #};
                   fwupd.enable = false;
                   sunshine = {
                     enable = true;
