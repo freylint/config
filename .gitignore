@@ -17,3 +17,6 @@ Cargo.lock
 # Node / npm
 node_modules/
 dist/
+
+# Build artifacts
+**/result

@@ -1,5 +1,5 @@
 // Features:
-// - HTTP server serving the Mithril.js SPA on PORT (default 8080)
+// - HTTP server serving the Elm SPA on PORT (default 8080)
 // - SEA mode: serves index.html and bundle.js from embedded assets
 // - Non-SEA mode: reads index.html and bundle.js from the filesystem (container and local dev)
 import fs from 'node:fs'

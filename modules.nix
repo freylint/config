@@ -1,15 +1,15 @@
 # Features:
 # - overlays: NUR, rust-overlay, nix-vscode-extensions overlays; unfree allowed
 # - desktop: KDE Plasma 6, SDDM Wayland, ksshaskpass, excluded KDE packages
-# - packages: system packages — dev, infra (nil LSP, awscli2), eda, desktop groups
+# - packages: system packages — dev (elm, rust), infra (nil LSP, awscli2), eda, desktop groups
 # - wake_on_lan: WoL (magic packet) on all physical Ethernet interfaces at boot
 # - users: normal users with wheel/networkmanager groups and admin SSH keys
 # - firefox: DuckDuckGo, vertical tabs, uBlock Origin, Dark Reader, SponsorBlock, Bitwarden, Catppuccin
 # - gtk: Catppuccin Mocha Mauve GTK theme, Papirus-Dark icons
 # - home_sops: SOPS age key derived from SSH ed25519 key on activation
-# - vscode: extensions, FiraCode, Catppuccin Mocha, SOPS integration, nil Nix LSP, vscodevim
+# - vscode: extensions, FiraCode, Catppuccin Mocha, SOPS integration, nil Nix LSP, vscodevim, elm-ls
 # - home: home-manager module — Firefox, GTK, VS Code, plasma, WezTerm, Zsh, Baloo, games
-# - workstation: workstation role — all NixOS config + home-manager wiring, Docker enabled
+# - workstation: workstation role — all NixOS config + home-manager wiring, Docker enabled, ntsync, gamemode
 let
   overlays =
     {
@@ -36,10 +36,7 @@ let
       services = {
         xserver = {
           enable = true;
-          xkb = {
-            layout = "us";
-            variant = "";
-          };
+          xkb.layout = "us";
           excludePackages = [ pkgs.xterm ];
         };
         displayManager = {
@@ -100,6 +97,8 @@ let
             "rust-analyzer"
           ];
         })
+        elmPackages.elm
+        elmPackages.elm-format
         # infra
         colmena
         claude-code
@@ -289,6 +288,8 @@ let
               ms-vscode-remote.remote-ssh
               signageos.signageos-vscode-sops
               vscodevim.vim
+              hbenl.vscode-test-explorer
+              elmtooling.elm-ls-vscode
             ])
             ++ (with pkgs.vscode-marketplace; [
               slevesque.shader
@@ -305,6 +306,8 @@ let
             "git.confirmSync" = false;
             "nix.enableLanguageServer" = true;
             "nix.serverPath" = "nil";
+            "elmLS.elmPath" = "elm";
+            "elmLS.elmFormatPath" = "elm-format";
             "sops.enabled" = true;
             "sops.creationEnabled" = false;
             "files.associations"."secrets/**/*.yaml" = "yaml";
@@ -370,7 +373,7 @@ let
         };
       };
       services.vscode-server.enable = true;
-      home.stateVersion = "25.11";
+      home.stateVersion = "26.05";
     };
 
   workstation =
@@ -406,11 +409,15 @@ let
         blueman.enable = true;
         printing.enable = true;
         openssh.enable = true;
+        udev.extraRules = ''KERNEL=="ntsync", TAG+="uaccess"'';
       };
       hardware.bluetooth.enable = true;
-      boot.loader = {
-        systemd-boot.enable = true;
-        efi.canTouchEfiVariables = true;
+      boot = {
+        loader = {
+          systemd-boot.enable = true;
+          efi.canTouchEfiVariables = true;
+        };
+        kernelModules = [ "ntsync" ]; # requires Linux 6.14+
       };
       time.timeZone = "America/New_York";
       i18n.defaultLocale = "en_US.UTF-8";
@@ -425,8 +432,9 @@ let
       sops.age.sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ];
       fonts.packages = [ pkgs.nerd-fonts.fira-code ];
       programs = {
-        steam.enable = true;
         alvr.enable = true;
+        gamemode.enable = true;
+        steam.enable = true;
         zsh.enable = true;
       };
       home-manager = {
@@ -439,7 +447,7 @@ let
         ];
         users = lib.genAttrs userNames (_: home);
       };
-      system.stateVersion = "25.11";
+      system.stateVersion = "26.05";
     };
 in
 {
