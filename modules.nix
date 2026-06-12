@@ -1,7 +1,7 @@
 # Features:
 # - overlays: NUR, rust-overlay, nix-vscode-extensions overlays; unfree allowed
 # - desktop: KDE Plasma 6, SDDM Wayland, ksshaskpass, excluded KDE packages
-# - packages: system packages — dev (elm, rust), infra (nil LSP, awscli2), eda, desktop groups
+# - packages: system packages — dev (elm, rust), infra (nil LSP, awscli2), eda, desktop groups (incl. Signal)
 # - wake_on_lan: WoL (magic packet) on all physical Ethernet interfaces at boot
 # - controllers: udev + Steam Input — steam-hardware, xone, xpadneo, gamescope session,
 #                game-devices-udev-rules, antimicrox/jstest-gtk/linuxConsoleTools/evtest
@@ -9,7 +9,7 @@
 # - firefox: DuckDuckGo, vertical tabs, uBlock Origin, Dark Reader, SponsorBlock, Bitwarden, Catppuccin
 # - gtk: Catppuccin Mocha Mauve GTK theme, Papirus-Dark icons
 # - home_sops: SOPS age key derived from SSH ed25519 key on activation
-# - vscode: extensions, FiraCode, Catppuccin Mocha, SOPS integration, nil Nix LSP, vscodevim, elm-ls
+# - vscode: extensions, FiraCode, Catppuccin Mocha, SOPS integration, nil Nix LSP, vscodevim, elm-ls, test-adapter-converter
 # - home: home-manager module — Firefox, GTK, VS Code, plasma, WezTerm, Zsh, Baloo, games
 # - workstation: workstation role — all NixOS config + home-manager wiring, Docker enabled, ntsync, gamemode
 let
@@ -118,6 +118,7 @@ let
         # desktop
         wezterm
         discord
+        signal-desktop
         heroic
         vkquake
         catppuccin-kde
@@ -318,6 +319,7 @@ let
               signageos.signageos-vscode-sops
               vscodevim.vim
               hbenl.vscode-test-explorer
+              ms-vscode.test-adapter-converter
               elmtooling.elm-ls-vscode
             ])
             ++ (with pkgs.vscode-marketplace; [
