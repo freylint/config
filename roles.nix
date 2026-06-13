@@ -1,9 +1,13 @@
 # Features:
-# - workstation: KDE Plasma 6 desktop role — base_workstation + desktop + plasma home-manager
-# - workstation_light: Sway desktop role — base_workstation + sway_desktop + sway home-manager
+# - workstation: KDE Plasma 6 desktop role
+# - workstation_light: Sway desktop role
 let
-  mods = import ./modules.nix;
-  inherit (mods) base_workstation desktop sway_desktop users home sway_home;
+  base_workstation = import ./modules/base_workstation.nix;
+  desktop = import ./modules/desktop.nix;
+  sway_desktop = import ./modules/sway_desktop.nix;
+  users = import ./modules/users.nix;
+  home = import ./modules/home/plasma.nix;
+  sway_home = import ./modules/home/sway.nix;
 
   workstation =
     {
@@ -14,7 +18,11 @@ let
       ...
     }:
     {
-      imports = [ base_workstation desktop users ];
+      imports = [
+        base_workstation
+        desktop
+        users
+      ];
       home-manager = {
         sharedModules = [
           plasma-manager.homeModules.plasma-manager
@@ -32,7 +40,11 @@ let
       ...
     }:
     {
-      imports = [ base_workstation sway_desktop users ];
+      imports = [
+        base_workstation
+        sway_desktop
+        users
+      ];
       home-manager = {
         sharedModules = [ nixos-vscode-server.homeModules.default ];
         users = lib.genAttrs userNames (_: sway_home);

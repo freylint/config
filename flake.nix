@@ -109,7 +109,8 @@
             nix-flatpak.nixosModules.nix-flatpak
             role
             { networking.hostName = name; }
-          ] ++ extraModules;
+          ]
+          ++ extraModules;
         };
 
       amdgpu = {
