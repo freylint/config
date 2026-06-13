@@ -14,7 +14,7 @@
 # - vscode: extensions, FiraCode, Catppuccin Mocha, SOPS integration, nil Nix LSP, vscodevim, elm-ls, test-adapter-converter
 # - home: home-manager module — Firefox, GTK, VS Code, plasma, WezTerm, Zsh, Baloo, games
 # - sway_home: home-manager module — Firefox, GTK, VS Code, Sway WM, waybar (Nerd Font + Catppuccin Mocha), mako, swaylock/swayidle, WezTerm, Zsh
-# - base_workstation: shared NixOS config — audio, Docker, Bluetooth, SSH, ntsync, gamemode, Flatpak, common packages
+# - base_workstation: shared NixOS config — audio, Docker, Bluetooth, SSH, ntsync, gamemode, Flatpak (nix-flatpak, com.jagex.Launcher), common packages
 let
   overlays =
     {
@@ -537,7 +537,10 @@ let
       security.rtkit.enable = true;
       virtualisation.docker.enable = true;
       services = {
-        flatpak.enable = true;
+        flatpak = {
+          enable = true;
+          packages = [ "com.jagex.Launcher" ];
+        };
         pulseaudio.enable = false;
         pipewire = {
           enable = true;

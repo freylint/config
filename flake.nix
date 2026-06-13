@@ -6,6 +6,7 @@
 # - virtual-display: local NixOS module sub-flake (pkg/virtual-display) providing AMD virtual display for homebase
 # - virtual-display-vm: QEMU test VM for the virtual-display module (nix run .#vdisp-vm; SSH :2222 root/root)
 # - Per-host targetHost override via COLMENA_HOST_<name> env var (multi-address support; requires --impure)
+# - nix-flatpak: declarative Flatpak management; com.jagex.Launcher installed on all hosts
 {
   description = "NixOS configuration";
 
@@ -40,6 +41,7 @@
       url = "github:Mic92/sops-nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    nix-flatpak.url = "github:gmodena/nix-flatpak";
 
     # Local sub-flake (pkg/virtual-display) consumed as a NixOS module only.
     # Has no external inputs, so no `inputs.nixpkgs.follows` is needed.
@@ -58,6 +60,7 @@
       rust-overlay,
       nixos-vscode-server,
       sops-nix,
+      nix-flatpak,
       virtual-display,
     }:
     let
@@ -101,6 +104,7 @@
             hwconfig
             home-manager.nixosModules.home-manager
             sops-nix.nixosModules.sops
+            nix-flatpak.nixosModules.nix-flatpak
             role
           ]
           ++ extraModules;
