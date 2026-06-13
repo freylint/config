@@ -10,10 +10,11 @@
 # - firefox: DuckDuckGo, vertical tabs, uBlock Origin, Dark Reader, SponsorBlock, Bitwarden, Catppuccin
 # - gtk: Catppuccin Mocha Mauve GTK theme, Papirus-Dark icons
 # - home_sops: SOPS age key derived from SSH ed25519 key on activation
+# - flatpak_profile: ~/.profile exporting Flatpak XDG_DATA_DIRS paths
 # - vscode: extensions, FiraCode, Catppuccin Mocha, SOPS integration, nil Nix LSP, vscodevim, elm-ls, test-adapter-converter
 # - home: home-manager module — Firefox, GTK, VS Code, plasma, WezTerm, Zsh, Baloo, games
 # - sway_home: home-manager module — Firefox, GTK, VS Code, Sway WM, waybar (Nerd Font + Catppuccin Mocha), mako, swaylock/swayidle, WezTerm, Zsh
-# - base_workstation: shared NixOS config — audio, Docker, Bluetooth, SSH, ntsync, gamemode, common packages
+# - base_workstation: shared NixOS config — audio, Docker, Bluetooth, SSH, ntsync, gamemode, Flatpak, common packages
 let
   overlays =
     {
@@ -385,7 +386,13 @@ let
     shellAliases.wanip = "curl -s ifconfig.me && echo";
   };
 
-  homeImports = [ firefox gtk home_sops vscode ];
+  flatpak_profile = {
+    home.file.".profile".text = ''
+      export XDG_DATA_DIRS=$XDG_DATA_DIRS:/usr/share:/var/lib/flatpak/exports/share:$HOME/.local/share/flatpak/exports/share
+    '';
+  };
+
+  homeImports = [ firefox gtk home_sops vscode flatpak_profile ];
 
   vkquakeEntry =
     config:
@@ -530,6 +537,7 @@ let
       security.rtkit.enable = true;
       virtualisation.docker.enable = true;
       services = {
+        flatpak.enable = true;
         pulseaudio.enable = false;
         pipewire = {
           enable = true;
