@@ -121,6 +121,7 @@ let
         signal-desktop
         heroic
         vkquake
+        runelite
         catppuccin-kde
         catppuccin-papirus-folders
         gnome-disk-utility
