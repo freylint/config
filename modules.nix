@@ -1,17 +1,19 @@
 # Features:
 # - overlays: NUR, rust-overlay, nix-vscode-extensions overlays; unfree allowed
-# - desktop: KDE Plasma 6, SDDM Wayland, ksshaskpass, excluded KDE packages
+# - desktop: KDE Plasma 6, SDDM Wayland, ksshaskpass, excluded KDE packages, catppuccin-kde
+# - sway_desktop: greetd/tuigreet login, Sway WM, XDG portals (wlr+gtk), wofi/grim/slurp/wl-clipboard
 # - packages: system packages — dev (elm, rust), infra (nil LSP, awscli2), eda, desktop groups (incl. Signal)
 # - wake_on_lan: WoL (magic packet) on all physical Ethernet interfaces at boot
 # - controllers: udev + Steam Input — steam-hardware, xone, xpadneo, gamescope session,
 #                game-devices-udev-rules, antimicrox/jstest-gtk/linuxConsoleTools/evtest
-# - users: normal users with wheel/networkmanager/docker/input groups and admin SSH keys
+# - users: normal users with wheel/networkmanager/docker/input groups, admin SSH keys, kate
 # - firefox: DuckDuckGo, vertical tabs, uBlock Origin, Dark Reader, SponsorBlock, Bitwarden, Catppuccin
 # - gtk: Catppuccin Mocha Mauve GTK theme, Papirus-Dark icons
 # - home_sops: SOPS age key derived from SSH ed25519 key on activation
 # - vscode: extensions, FiraCode, Catppuccin Mocha, SOPS integration, nil Nix LSP, vscodevim, elm-ls, test-adapter-converter
 # - home: home-manager module — Firefox, GTK, VS Code, plasma, WezTerm, Zsh, Baloo, games
-# - workstation: workstation role — all NixOS config + home-manager wiring, Docker enabled, ntsync, gamemode
+# - sway_home: home-manager module — Firefox, GTK, VS Code, Sway WM, waybar (Nerd Font + Catppuccin Mocha), mako, swaylock/swayidle, WezTerm, Zsh
+# - base_workstation: shared NixOS config — audio, Docker, Bluetooth, SSH, ntsync, gamemode, common packages
 let
   overlays =
     {
@@ -55,19 +57,44 @@ let
         desktopManager.plasma6.enable = true;
       };
       environment = {
-        plasma6.excludePackages = with pkgs.kdePackages; [
-          konsole
-          elisa
-          oxygen
-          khelpcenter
-          krdp
-        ];
+        plasma6.excludePackages = with pkgs.kdePackages; [ konsole elisa oxygen khelpcenter krdp ];
         sessionVariables = {
           SSH_ASKPASS_REQUIRE = "prefer";
           SUDO_ASKPASS = ksshaskpass;
         };
+        systemPackages = [ pkgs.catppuccin-kde ];
       };
       programs.ssh.askPassword = ksshaskpass;
+    };
+
+  sway_desktop =
+    { pkgs, ... }:
+    {
+      services.greetd = {
+        enable = true;
+        settings.default_session = {
+          command = "${pkgs.tuigreet}/bin/tuigreet --time --cmd sway";
+          user = "greeter";
+        };
+      };
+      programs.sway = {
+        enable = true;
+        wrapperFeatures.gtk = true;
+      };
+      xdg.portal = {
+        enable = true;
+        wlr.enable = true;
+        extraPortals = [ pkgs.xdg-desktop-portal-gtk ];
+      };
+      environment = {
+        sessionVariables = {
+          MOZ_ENABLE_WAYLAND = "1";
+          NIXOS_OZONE_WL = "1";
+          XDG_CURRENT_DESKTOP = "sway";
+        };
+        systemPackages = with pkgs; [ wofi grim slurp wl-clipboard ];
+      };
+      security.polkit.enable = true;
     };
 
   packages =
@@ -86,7 +113,6 @@ let
     in
     {
       environment.systemPackages = with pkgs; [
-        # dev
         python3
         neovim
         git
@@ -94,14 +120,10 @@ let
         gnumake
         gcc
         (rust-bin.beta.latest.default.override {
-          extensions = [
-            "rust-src"
-            "rust-analyzer"
-          ];
+          extensions = [ "rust-src" "rust-analyzer" ];
         })
         elmPackages.elm
         elmPackages.elm-format
-        # infra
         colmena
         claude-code
         awscli2
@@ -111,18 +133,15 @@ let
         sops
         age
         ssh-to-age
-        # eda
         kicad
         openscad
         yosys
-        # desktop
         wezterm
         discord
         signal-desktop
         heroic
         vkquake
         runelite
-        catppuccin-kde
         catppuccin-papirus-folders
         gnome-disk-utility
         gparted
@@ -171,15 +190,11 @@ let
       };
       # Extra vendor rules: 8BitDo, Stadia, Razer, Switch joycond, evhz, etc.
       services.udev.packages = [ pkgs.game-devices-udev-rules ];
-      environment.systemPackages = with pkgs; [
-        antimicrox
-        jstest-gtk
-        linuxConsoleTools
-        evtest
-      ];
+      environment.systemPackages = with pkgs; [ antimicrox jstest-gtk linuxConsoleTools evtest ];
     };
 
-  users =
+  mkUsers =
+    getExtraPkgs:
     {
       lib,
       pkgs,
@@ -191,22 +206,19 @@ let
       mkUser = name: {
         isNormalUser = true;
         description = name;
-        extraGroups = [
-          "networkmanager"
-          "wheel"
-          "docker"
-          "input"
-        ];
+        extraGroups = [ "networkmanager" "wheel" "docker" "input" ];
         shell = pkgs.zsh;
         openssh.authorizedKeys.keys = adminKeys;
-        packages = [ pkgs.kdePackages.kate ];
+        packages = getExtraPkgs pkgs;
       };
     in
     {
-      users.users = lib.genAttrs userNames mkUser // {
-        root.openssh.authorizedKeys.keys = adminKeys;
-      };
+      users.users =
+        lib.genAttrs userNames mkUser
+        // { root.openssh.authorizedKeys.keys = adminKeys; };
     };
+
+  users = mkUsers (pkgs: [ pkgs.kdePackages.kate ]);
 
   firefox =
     { pkgs, ... }:
@@ -348,15 +360,47 @@ let
       };
     };
 
+  wezterm_cfg = {
+    enable = true;
+    extraConfig = ''
+      local wezterm = require("wezterm")
+      return {
+        font = wezterm.font("FiraCode Nerd Font", { weight = "Regular" }),
+        font_size = 12.0,
+        harfbuzz_features = { "calt=1", "clig=1", "liga=1" },
+        color_scheme = "Catppuccin Mocha",
+      }
+    '';
+  };
+
+  zsh_cfg = {
+    enable = true;
+    syntaxHighlighting.enable = true;
+    autosuggestion.enable = true;
+    oh-my-zsh = {
+      enable = true;
+      theme = "robbyrussell";
+      plugins = [ "git" ];
+    };
+    shellAliases.wanip = "curl -s ifconfig.me && echo";
+  };
+
+  homeImports = [ firefox gtk home_sops vscode ];
+
+  vkquakeEntry =
+    config:
+    {
+      name = "vkQuake";
+      comment = "Vulkan Quake port based on QuakeSpasm";
+      exec = "vkquake -basedir ${config.home.homeDirectory}/Games/Heroic/Quake";
+      icon = "vkquake";
+      categories = [ "Game" ];
+    };
+
   home =
     { config, ... }:
     {
-      imports = [
-        firefox
-        gtk
-        home_sops
-        vscode
-      ];
+      imports = homeImports;
       programs = {
         plasma = {
           enable = true;
@@ -367,64 +411,120 @@ let
             wallpaperPictureOfTheDay.provider = "apod";
           };
         };
-        wezterm = {
-          enable = true;
-          extraConfig = ''
-            local wezterm = require("wezterm")
-            return {
-              font = wezterm.font("FiraCode Nerd Font", { weight = "Regular" }),
-              font_size = 12.0,
-              harfbuzz_features = { "calt=1", "clig=1", "liga=1" },
-              color_scheme = "Catppuccin Mocha",
-            }
-          '';
-        };
-        zsh = {
-          enable = true;
-          syntaxHighlighting.enable = true;
-          autosuggestion.enable = true;
-          oh-my-zsh = {
-            enable = true;
-            theme = "robbyrussell";
-            plugins = [ "git" ];
-          };
-          shellAliases.wanip = "curl -s ifconfig.me && echo";
-        };
+        wezterm = wezterm_cfg;
+        zsh = zsh_cfg;
       };
       xdg = {
         configFile."baloofilerc".text = ''
           [Basic Settings]
           Indexing-Enabled=false
         '';
-        desktopEntries.vkquake = {
-          name = "vkQuake";
-          comment = "Vulkan Quake port based on QuakeSpasm";
-          exec = "vkquake -basedir ${config.home.homeDirectory}/Games/Heroic/Quake";
-          icon = "vkquake";
-          categories = [ "Game" ];
-        };
+        desktopEntries.vkquake = vkquakeEntry config;
       };
       services.vscode-server.enable = true;
       home.stateVersion = "26.05";
     };
 
-  workstation =
+  sway_home =
+    { pkgs, config, ... }:
+    let
+      swaylockCmd = "${pkgs.swaylock}/bin/swaylock -f";
+    in
     {
-      lib,
-      pkgs,
-      userNames,
-      plasma-manager,
-      nixos-vscode-server,
-      ...
-    }:
+      imports = homeImports;
+      wayland.windowManager.sway = {
+        enable = true;
+        config = {
+          modifier = "Mod4";
+          terminal = "wezterm";
+          menu = "wofi --show drun";
+          bars = [ { command = "waybar"; } ];
+          startup = [ { command = "mako"; } ];
+        };
+      };
+      programs = {
+        waybar = {
+          enable = true;
+          settings = [{
+            layer = "top";
+            position = "top";
+            modules-left = [ "sway/workspaces" "sway/mode" ];
+            modules-center = [ "clock" ];
+            modules-right = [ "pulseaudio" "network" "cpu" "memory" "battery" "tray" ];
+            "sway/workspaces".format = "{icon}";
+            clock = { format = " {:%H:%M}"; format-alt = " {:%Y-%m-%d}"; };
+            cpu.format = " {usage}%";
+            memory.format = " {}%";
+            battery = {
+              format = "{icon} {capacity}%";
+              format-charging = " {capacity}%";
+              format-icons = [ "" "" "" "" "" ];
+            };
+            network = {
+              format-wifi = " {essid}";
+              format-ethernet = " {ipaddr}";
+              format-disconnected = " Disconnected";
+            };
+            pulseaudio = {
+              format = "{icon} {volume}%";
+              format-muted = " Muted";
+              format-icons.default = [ "" "" "" ];
+            };
+          }];
+          style = ''
+            * {
+              font-family: "FiraCode Nerd Font", monospace;
+              font-size: 13px;
+              border: none;
+              border-radius: 0;
+              min-height: 0;
+              color: #cdd6f4;
+              background: transparent;
+            }
+            window#waybar {
+              background-color: #1e1e2e;
+            }
+            #workspaces button {
+              color: #cdd6f4;
+              background: transparent;
+              padding: 0 6px;
+            }
+            #workspaces button.active { color: #cba6f7; }
+            #workspaces button.urgent { color: #f38ba8; }
+            #clock, #cpu, #memory, #network, #pulseaudio, #battery, #tray {
+              padding: 0 10px;
+              color: #cdd6f4;
+            }
+            #battery.charging { color: #a6e3a1; }
+            #battery.warning:not(.charging) { color: #f9e2af; }
+            #battery.critical:not(.charging) { color: #f38ba8; }
+          '';
+        };
+        swaylock.settings.color = "1e1e2e";
+        wezterm = wezterm_cfg;
+        zsh = zsh_cfg;
+      };
+      services = {
+        mako.enable = true;
+        swayidle = {
+          enable = true;
+          events = { before-sleep = swaylockCmd; };
+          timeouts = [ { timeout = 600; command = swaylockCmd; } ];
+        };
+        vscode-server.enable = true;
+      };
+      xdg.desktopEntries.vkquake = vkquakeEntry config;
+      home.stateVersion = "26.05";
+    };
+
+  base_workstation =
+    { pkgs, ... }:
     {
       imports = [
         overlays
-        desktop
         packages
         wake_on_lan
         controllers
-        users
         # virtual-display moved to pkg/virtual-display/ (standalone flake, imported by flake.nix)
       ];
       security.rtkit.enable = true;
@@ -458,10 +558,7 @@ let
         domain = "freyground.com";
         networkmanager.enable = true;
       };
-      nix.settings.experimental-features = [
-        "nix-command"
-        "flakes"
-      ];
+      nix.settings.experimental-features = [ "nix-command" "flakes" ];
       sops.age.sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ];
       fonts.packages = [ pkgs.nerd-fonts.fira-code ];
       programs = {
@@ -474,15 +571,18 @@ let
         useGlobalPkgs = true;
         useUserPackages = true;
         backupCommand = "mv \"$1\" \"$1.$(date +%Y%m%dT%H%M%S).bak\"";
-        sharedModules = [
-          plasma-manager.homeModules.plasma-manager
-          nixos-vscode-server.homeModules.default
-        ];
-        users = lib.genAttrs userNames (_: home);
       };
       system.stateVersion = "26.05";
     };
+
 in
 {
-  inherit workstation;
+  inherit
+    base_workstation
+    desktop
+    sway_desktop
+    users
+    home
+    sway_home
+    ;
 }

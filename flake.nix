@@ -77,13 +77,14 @@
         "bat"
       ];
 
-      mods = import ./modules.nix;
+      roles = import ./roles.nix;
 
       mkHost =
         {
           name,
           hwconfig,
           deployment,
+          role ? roles.workstation,
           extraModules ? [ ],
         }:
         { ... }:
@@ -100,7 +101,7 @@
             hwconfig
             home-manager.nixosModules.home-manager
             sops-nix.nixosModules.sops
-            mods.workstation
+            role
           ]
           ++ extraModules;
           networking.hostName = name;
@@ -251,6 +252,7 @@
         glw = mkHost {
           name = "glw";
           hwconfig = ./hwdef/glw.nix;
+          role = roles.workstation_light;
           deployment = {
             targetHost = null;
             allowLocalDeployment = true;
