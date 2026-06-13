@@ -1,5 +1,5 @@
 # Features:
-# - Audio (pipewire), Docker, Bluetooth, SSH, printing, ntsync, gamemode, Flatpak (nix-flatpak, com.jagex.Launcher)
+# - Audio (pipewire), Docker, Bluetooth, SSH, printing, ntsync, gamemode, Flatpak (nix-flatpak, Bolt Launcher)
 # - System overlays, packages, WoL, gaming controllers via imports
 { pkgs, ... }: {
   imports = [
@@ -21,7 +21,7 @@
       ];
       packages = [
         {
-          appId = "com.jagex.Launcher";
+          appId = "com.adamcake.Bolt";
           origin = "flathub";
         }
       ];
