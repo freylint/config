@@ -125,7 +125,6 @@ let
         })
         elmPackages.elm
         elmPackages.elm-format
-        colmena
         claude-code
         awscli2
         lightsailctl
@@ -539,7 +538,11 @@ let
       services = {
         flatpak = {
           enable = true;
-          packages = [ "com.jagex.Launcher" ];
+          remotes = [{
+            name = "flathub";
+            location = "https://dl.flathub.org/repo/flathub.flatpakrepo";
+          }];
+          packages = [{ appId = "com.jagex.Launcher"; origin = "flathub"; }];
         };
         pulseaudio.enable = false;
         pipewire = {
@@ -554,6 +557,15 @@ let
         printing.enable = true;
         openssh.enable = true;
         udev.extraRules = ''KERNEL=="ntsync", TAG+="uaccess"'';
+      };
+      # flatpak-managed-install has no network dependency by default and uses
+      # RestartSec=60s — too slow for colmena's activation window. Add
+      # network-online ordering and retry quickly so the second attempt succeeds
+      # before colmena times out.
+      systemd.services.flatpak-managed-install = {
+        wants = [ "network-online.target" ];
+        after = [ "network-online.target" ];
+        serviceConfig.RestartSec = "5s";
       };
       hardware.bluetooth.enable = true;
       boot = {

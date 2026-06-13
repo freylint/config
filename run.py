@@ -8,7 +8,7 @@ Task runner — interactive TUI or direct execution.
 Features:
   - Targets: deploy, deploy-hosts, deploy-local, collar, lightsail, rekey,
              update, flake-update, lock, unlock, ss-dev, vdisp-test, vdisp-vm
-  - Deploy pipeline: WoL, hwdef, flake update, fmt, colmena apply
+  - Deploy pipeline: WoL, hwdef, flake update, fmt, nixos-rebuild per host
   - Multi-address resolution per host: first reachable address selected at deploy time
   - AWS Lightsail container build and deploy (nix build → docker load → push → deploy)
   - SOPS secret rekeying
@@ -36,9 +36,10 @@ COLLAR = REPO / "pkg" / "collar"
 HOSTS: dict[str, dict] = {
     # mac: set to "aa:bb:cc:dd:ee:ff" to enable Wake-on-LAN; None disables WoL
     # hosts: list of addresses tried in order; first reachable one is used
-    "glw":      {"hosts": ["glw.lan"],                 "user": "gen", "mac": None},
-    "batpc":    {"hosts": ["batpc.lan"],                "user": "bat", "mac": None},
-    "homebase": {"hosts": ["homebase.freyground.com"],  "user": "gen", "mac": None},
+    # local: True means deploy without --target-host (run nixos-rebuild directly)
+    "glw":      {"hosts": ["glw.lan"],                 "user": "gen", "mac": None, "local": True},
+    "batpc":    {"hosts": ["batpc.lan"],                "user": "bat", "mac": None, "local": False},
+    "homebase": {"hosts": ["homebase.freyground.com"],  "user": "gen", "mac": None, "local": False},
 }
 
 
@@ -50,19 +51,19 @@ class Target:
 
 
 TARGETS: list[Target] = [
-    Target("deploy",       "Full deploy: hwdef → update → fmt → colmena all", None),
-    Target("deploy-hosts", "Deploy to DEPLOY_HOSTS (comma-separated env var)",               None),
-    Target("deploy-local", "Apply config to local machine via colmena apply-local",         None),
-    Target("collar",       "Build collar embedded firmware via nix",                         None),
+    Target("deploy",       "Full deploy: hwdef → update → fmt → nixos-rebuild all", None),
+    Target("deploy-hosts", "Deploy to DEPLOY_HOSTS (comma-separated env var)",       None),
+    Target("deploy-local", "Apply config to local machine via nixos-rebuild switch", None),
+    Target("collar",       "Build collar embedded firmware via nix",                  None),
     Target("lightsail",    "Build container and deploy to AWS Lightsail (set LIGHTSAIL_SERVICE)", None),
-    Target("rekey",        "Re-encrypt all sops secrets for current key set",                    None),
+    Target("rekey",        "Re-encrypt all sops secrets for current key set",         None),
     Target("lock",         "Lock the display session",   lambda: ["loginctl", "lock-session",   _session()]),
     Target("unlock",       "Unlock the display session", lambda: ["loginctl", "unlock-session", _session()]),
-    Target("update",       "Update flake inputs and reformat (UPDATE_INPUT=<name> for one)",  None),
-    Target("flake-update", "Update flake.lock (nix flake update)",                           None),
-    Target("ss-dev",       "Screensaver dev cycle: unlock → wait 5s → lock",                None),
-    Target("vdisp-test",   "Check virtual display service and DRM state on homebase",        None),
-    Target("vdisp-vm",     "Build and run virtual-display test VM (SSH :2222 root/root)",    None),
+    Target("update",       "Update flake inputs and reformat (UPDATE_INPUT=<name> for one)", None),
+    Target("flake-update", "Update flake.lock (nix flake update)",                    None),
+    Target("ss-dev",       "Screensaver dev cycle: unlock → wait 5s → lock",         None),
+    Target("vdisp-test",   "Check virtual display service and DRM state on homebase", None),
+    Target("vdisp-vm",     "Build and run virtual-display test VM (SSH :2222 root/root)", None),
 ]
 
 
@@ -86,11 +87,6 @@ def _session() -> str | None:
         if len(parts) >= 4 and parts[3] != "-":
             return parts[0]
     return None
-
-
-def _nixos(*args: str) -> list[str]:
-    """Wrap a command to run inside the nixos devShell."""
-    return ["nix", "develop", str(NIXOS), "--command", *args]
 
 
 def _wake(mac: str) -> None:
@@ -159,12 +155,12 @@ def _fmt() -> int:
     return _run(["nix", "fmt", "."], cwd=NIXOS)
 
 
-def _colmena(on: list[str] | None = None, extra_env: dict[str, str] | None = None) -> int:
-    cmd = ["colmena", "apply", "--impure"]
-    if on:
-        cmd += ["--on", ",".join(on)]
-    env = {"NIXPKGS_ALLOW_UNFREE": "1", **(extra_env or {})}
-    return _run(_nixos(*cmd), cwd=NIXOS, extra_env=env)
+def _nixos_rebuild(host: str, target_addr: str | None = None) -> int:
+    """Deploy a NixOS host via nixos-rebuild switch."""
+    cmd = ["nixos-rebuild", "switch", "--flake", f"{NIXOS}#{host}", "--impure"]
+    if target_addr:
+        cmd += ["--target-host", f"root@{target_addr}", "--build-host", f"root@{target_addr}"]
+    return _run(cmd, cwd=NIXOS, extra_env={"NIXPKGS_ALLOW_UNFREE": "1"})
 
 
 def _pipeline(on: list[str] | None = None) -> int:
@@ -176,11 +172,8 @@ def _pipeline(on: list[str] | None = None) -> int:
         print(f"  step failed (exit {rc})", file=sys.stderr)
         return rc
 
-    # Resolve after WoL so sleeping hosts are online before address selection.
-    # Keys must match colmena attribute names exactly; null-targetHost hosts ignore it via Nix guard.
     print("\n→ resolve")
     resolved = {n: _resolve_host(n, info["hosts"]) for n, info in targets.items()}
-    host_env = {f"COLMENA_HOST_{n}": h for n, h in resolved.items()}
 
     print("\n→ hwdefs")
     for n in targets:  # non-fatal: sudo/TTY may be unavailable
@@ -196,10 +189,13 @@ def _pipeline(on: list[str] | None = None) -> int:
         print(f"  step failed (exit {rc})", file=sys.stderr)
         return rc
 
-    print("\n→ colmena apply")
-    if rc := _colmena(on, extra_env=host_env):
-        print(f"  step failed (exit {rc})", file=sys.stderr)
-        return rc
+    print("\n→ nixos-rebuild")
+    for name, info in targets.items():
+        addr = None if info.get("local") else resolved[name]
+        print(f"  {name}" + (f" → {addr}" if addr else " (local)"))
+        if rc := _nixos_rebuild(name, addr):
+            print(f"  step failed (exit {rc})", file=sys.stderr)
+            return rc
 
     return 0
 
@@ -299,11 +295,7 @@ def run_target(target: Target) -> int:
             hosts = [h.strip() for h in os.environ.get("DEPLOY_HOSTS", "").split(",") if h.strip()]
             return _pipeline(on=hosts or None)
         case "deploy-local":
-            return _run(
-                _nixos("colmena", "apply-local", "--impure", "--sudo"),
-                cwd=NIXOS,
-                extra_env={"NIXPKGS_ALLOW_UNFREE": "1"},
-            )
+            return _nixos_rebuild("glw")
         case "collar":
             return _run(["nix", "build", ".#default"], cwd=COLLAR)
         case "lightsail":
