@@ -22,6 +22,7 @@
       MOZ_ENABLE_WAYLAND = "1";
       NIXOS_OZONE_WL = "1";
       XDG_CURRENT_DESKTOP = "sway";
+      _JAVA_AWT_WM_NONREPARENTING = "1";
     };
     systemPackages = with pkgs; [
       wofi
