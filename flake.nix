@@ -1,18 +1,18 @@
 # Features:
-# - Three NixOS hosts: glw (local), batpc, homebase — deployed via colmena
-# - Dev shell with colmena, sops, age, ssh-to-age
+# - Three NixOS hosts: glw (local), batpc, homebase — deployed via nixos-rebuild
+# - Dev shell with sops, age, ssh-to-age
 # - Docker container image (Node.js www SPA; Elm bundled via elm make + buildNpmPackage, port 8080)
 # - Nix formatter (nixfmt-tree)
 # - virtual-display: local NixOS module sub-flake (pkg/virtual-display) providing AMD virtual display for homebase
 # - virtual-display-vm: QEMU test VM for the virtual-display module (nix run .#vdisp-vm; SSH :2222 root/root)
-# - Per-host targetHost override via COLMENA_HOST_<name> env var (multi-address support; requires --impure)
+# - nix-flatpak: declarative Flatpak management; com.jagex.Launcher installed on all hosts
 {
   description = "NixOS configuration";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
     home-manager = {
-      url = "github:nix-community/home-manager";
+      url = "github:nix-community/home-manager/release-26.05";
       inputs.nixpkgs.follows = "nixpkgs";
     };
     nix-vscode-extensions = {
@@ -40,6 +40,7 @@
       url = "github:Mic92/sops-nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    nix-flatpak.url = "github:gmodena/nix-flatpak";
 
     # Local sub-flake (pkg/virtual-display) consumed as a NixOS module only.
     # Has no external inputs, so no `inputs.nixpkgs.follows` is needed.
@@ -58,6 +59,7 @@
       rust-overlay,
       nixos-vscode-server,
       sops-nix,
+      nix-flatpak,
       virtual-display,
     }:
     let
@@ -77,38 +79,50 @@
         "bat"
       ];
 
-      mods = import ./modules.nix;
+      roles = import ./roles.nix;
+
+      specialArgs = {
+        inherit
+          adminKeys
+          userNames
+          plasma-manager
+          nixos-vscode-server
+          nur
+          rust-overlay
+          nix-vscode-extensions
+          ;
+      };
 
       mkHost =
         {
           name,
           hwconfig,
-          deployment,
+          role ? roles.workstation,
           extraModules ? [ ],
         }:
-        { ... }:
-        let
-          envHost = builtins.getEnv "COLMENA_HOST_${name}";
-          resolvedDeployment =
-            if deployment.targetHost != null && envHost != "" then
-              deployment // { targetHost = envHost; }
-            else
-              deployment;
-        in
-        {
-          imports = [
+        nixpkgs.lib.nixosSystem {
+          inherit specialArgs;
+          modules = [
             hwconfig
             home-manager.nixosModules.home-manager
             sops-nix.nixosModules.sops
-            mods.workstation
+            nix-flatpak.nixosModules.nix-flatpak
+            role
+            { networking.hostName = name; }
           ]
           ++ extraModules;
-          networking.hostName = name;
-          deployment = resolvedDeployment;
         };
 
       amdgpu = {
         services.xserver.videoDrivers = [ "amdgpu" ];
+        hardware.graphics = {
+          enable = true;
+          enable32Bit = true;
+        };
+      };
+
+      intel = {
+        services.xserver.videoDrivers = [ "modesetting" ];
         hardware.graphics = {
           enable = true;
           enable32Bit = true;
@@ -197,7 +211,6 @@
 
       devShells.${system}.default = pkgs.mkShell {
         packages = with pkgs; [
-          colmena
           sops
           age
           ssh-to-age
@@ -206,49 +219,26 @@
 
       formatter.${system} = pkgs.nixfmt-tree;
 
-      nixosConfigurations.virtual-display-vm = nixpkgs.lib.nixosSystem {
-        inherit system;
-        modules = [
-          virtual-display.nixosModules.default
-          ./pkg/virtual-display/vm.nix
-        ];
-      };
-
       apps.${system}.vdisp-vm = {
         type = "app";
         program = nixpkgs.lib.getExe vdispVm;
       };
 
-      colmena = {
-        meta = {
-          nixpkgs = pkgs;
-          specialArgs = {
-            inherit
-              adminKeys
-              userNames
-              plasma-manager
-              nixos-vscode-server
-              nur
-              rust-overlay
-              nix-vscode-extensions
-              ;
-          };
-        };
-
-        defaults.deployment = {
-          buildOnTarget = true;
-          targetUser = "root";
+      nixosConfigurations = {
+        virtual-display-vm = nixpkgs.lib.nixosSystem {
+          modules = [
+            { nixpkgs.hostPlatform = system; }
+            virtual-display.nixosModules.default
+            ./pkg/virtual-display/vm.nix
+          ];
         };
 
         glw = mkHost {
           name = "glw";
           hwconfig = ./hwdef/glw.nix;
-          deployment = {
-            targetHost = null;
-            allowLocalDeployment = true;
-          };
+          role = roles.workstation_light;
           extraModules = [
-            amdgpu
+            intel
             (
               { pkgs, ... }:
               {
@@ -261,15 +251,12 @@
         batpc = mkHost {
           name = "batpc";
           # Prefer an existing local hardware configuration on the host itself.
+          # Requires --impure when evaluated remotely.
           hwconfig =
             if builtins.pathExists /etc/nixos/hardware-configuration.nix then
               /etc/nixos/hardware-configuration.nix
             else
               ./hwdef/batpc.nix;
-          deployment = {
-            targetHost = "batpc.lan";
-            allowLocalDeployment = true;
-          };
           extraModules = [
             {
               services.xserver.videoDrivers = [ "nvidia" ];
@@ -291,10 +278,6 @@
         homebase = mkHost {
           name = "homebase";
           hwconfig = ./hwdef/homebase.nix;
-          deployment = {
-            targetHost = "homebase.freyground.com";
-            allowLocalDeployment = true;
-          };
           extraModules = [
             amdgpu
             # virtual-display.nixosModules.default
