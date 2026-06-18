@@ -1,5 +1,5 @@
 # Features:
-# - greetd/tuigreet login, Sway WM, XDG portals (wlr+gtk), wofi/grim/slurp/wl-clipboard
+# - greetd/tuigreet login, Sway WM, XDG portals (wlr+gtk), wofi/grim/slurp/wl-clipboard/pavucontrol
 { pkgs, ... }: {
   services.greetd = {
     enable = true;
@@ -29,6 +29,7 @@
       grim
       slurp
       wl-clipboard
+      pavucontrol
     ];
   };
   security.polkit.enable = true;

@@ -75,6 +75,7 @@ in
               ""
               ""
             ];
+            on-click = "pavucontrol";
           };
         }
       ];

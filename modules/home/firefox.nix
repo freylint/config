@@ -1,5 +1,5 @@
 # Features:
-# - Firefox: DuckDuckGo, vertical tabs, uBlock Origin, Dark Reader, SponsorBlock, Bitwarden, Catppuccin
+# - Firefox: DuckDuckGo, vertical tabs, uBlock Origin, Dark Reader, SponsorBlock, Bitwarden, Catppuccin, YouTube Shorts Block, Tampermonkey
 { pkgs, ... }:
 let
   mkAddon =
@@ -45,6 +45,20 @@ in
           addonId = "{76aabc99-c1a8-4c1e-832b-d4f2941d5a7a}";
           url = "https://github.com/catppuccin/firefox/releases/download/old/catppuccin_mocha_mauve.xpi";
           sha256 = "1gkv12034d2dbbvr2fmxbqifmgmfv0lh58my1gmkcvfpxrap6ad5";
+        })
+        (mkAddon {
+          pname = "youtube-shorts-block";
+          version = "1.5.3";
+          addonId = "{34daeb50-c2d2-4f14-886a-7160b24d66a4}";
+          url = "https://addons.mozilla.org/firefox/downloads/file/4487339/youtube_shorts_block-1.5.3.xpi";
+          sha256 = "0hr0xczsclrxnyx4ng3jcmipcqr9g1yk6alrg4nxp0n77cwrcj3p";
+        })
+        (mkAddon {
+          pname = "tampermonkey";
+          version = "5.5.0";
+          addonId = "firefox@tampermonkey.net";
+          url = "https://addons.mozilla.org/firefox/downloads/file/4797143/tampermonkey-5.5.0.xpi";
+          sha256 = "022r0s61bz7qg3r5vprlw78mm1bbiqn1yq1m908rcmmwip3k200r";
         })
       ];
     };
