@@ -5,7 +5,7 @@
 # - Flatpak (nix-flatpak): flathub remote, com.adamcake.Bolt; network-online ordering workaround
 # - SOPS secrets (age via SSH host key), home-manager (global pkgs, backup on collision)
 # - Fonts: FiraCode Nerd Font; locale: en_US.UTF-8 / America/New_York
-# - Nix experimental features: nix-command, flakes; Zsh system shell
+# - Nix: experimental features (nix-command, flakes), nixPath pinned to system nixpkgs (nix-shell -p); Zsh system shell
 # - System overlays, packages, WoL, gaming controllers via imports
 { pkgs, ... }: {
   imports = [
@@ -64,10 +64,13 @@
     domain = "freyground.com";
     networkmanager.enable = true;
   };
-  nix.settings.experimental-features = [
-    "nix-command"
-    "flakes"
-  ];
+  nix = {
+    nixPath = [ "nixpkgs=${pkgs.path}" ];
+    settings.experimental-features = [
+      "nix-command"
+      "flakes"
+    ];
+  };
   sops.age.sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ];
   fonts.packages = [ pkgs.nerd-fonts.fira-code ];
   programs = {
