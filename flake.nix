@@ -1,5 +1,6 @@
 # Features:
 # - Three NixOS hosts: glw (XFCE, local), batpc, homebase — deployed via nixos-rebuild
+# - glw: nixos-hardware common modules (Intel CPU microcode/VAAPI, laptop TLP, SSD fstrim); OpenRazer driver+daemon
 # - glw: game launcher scripts (heroic, vkquake, runelite) via nvidia-offload + gamemoderun
 # - Dev shell with sops, age, ssh-to-age
 # - Docker container image (Node.js www SPA; Elm bundled via elm make + buildNpmPackage, port 8080)
@@ -42,6 +43,7 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     nix-flatpak.url = "github:gmodena/nix-flatpak";
+    nixos-hardware.url = "github:NixOS/nixos-hardware";
 
     # Local sub-flake (pkg/virtual-display) consumed as a NixOS module only.
     # Has no external inputs, so no `inputs.nixpkgs.follows` is needed.
@@ -61,6 +63,7 @@
       nixos-vscode-server,
       sops-nix,
       nix-flatpak,
+      nixos-hardware,
       virtual-display,
     }:
     let
@@ -231,11 +234,18 @@
           hwconfig = ./hwdef/glw.nix;
           role = roles.workstation_xfce;
           extraModules = [
+            nixos-hardware.nixosModules.common-cpu-intel
+            nixos-hardware.nixosModules.common-pc-laptop
+            nixos-hardware.nixosModules.common-pc-ssd
             (
               { pkgs, ... }:
               {
                 services.xserver.videoDrivers = [ "nvidia" ];
                 hardware = {
+                  openrazer = {
+                    enable = true;
+                    users = userNames;
+                  };
                   nvidia = {
                     modesetting.enable = true;
                     open = false;

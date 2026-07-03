@@ -1,7 +1,7 @@
 # Features:
 # - homeImports: shared home-manager modules (firefox, gtk, home_sops, vscode, flatpak_profile)
 # - wezterm_cfg: FiraCode Nerd Font + Catppuccin Mocha
-# - zsh_cfg: oh-my-zsh, syntax highlighting, autosuggestion
+# - zsh_cfg: oh-my-zsh, syntax highlighting, autosuggestion; aliases: wanip, claude (--continue)
 # - vkquakeEntry: vkQuake desktop entry builder
 {
   homeImports = [
@@ -32,7 +32,10 @@
       theme = "robbyrussell";
       plugins = [ "git" ];
     };
-    shellAliases.wanip = "curl -s ifconfig.me && echo";
+    shellAliases = {
+      wanip = "curl -s ifconfig.me && echo";
+      claude = "claude --continue";
+    };
   };
   vkquakeEntry = config: {
     name = "vkQuake";
