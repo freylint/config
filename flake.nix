@@ -1,11 +1,12 @@
 # Features:
-# - Three NixOS hosts: glw (local), batpc, homebase — deployed via nixos-rebuild
+# - Three NixOS hosts: glw (XFCE, local), batpc, homebase — deployed via nixos-rebuild
+# - glw: game launcher scripts (heroic, vkquake, runelite) via nvidia-offload + gamemoderun
 # - Dev shell with sops, age, ssh-to-age
 # - Docker container image (Node.js www SPA; Elm bundled via elm make + buildNpmPackage, port 8080)
 # - Nix formatter (nixfmt-tree)
 # - virtual-display: local NixOS module sub-flake (pkg/virtual-display) providing AMD virtual display for homebase
 # - virtual-display-vm: QEMU test VM for the virtual-display module (nix run .#vdisp-vm; SSH :2222 root/root)
-# - nix-flatpak: declarative Flatpak management; com.jagex.Launcher installed on all hosts
+# - nix-flatpak: declarative Flatpak management; com.adamcake.Bolt installed on all hosts
 {
   description = "NixOS configuration";
 
@@ -121,14 +122,6 @@
         };
       };
 
-      intel = {
-        services.xserver.videoDrivers = [ "modesetting" ];
-        hardware.graphics = {
-          enable = true;
-          enable32Bit = true;
-        };
-      };
-
       batpcPackages = with pkgs; [ prismlauncher ];
 
       vdispVm = self.nixosConfigurations.virtual-display-vm.config.system.build.vm;
@@ -236,13 +229,54 @@
         glw = mkHost {
           name = "glw";
           hwconfig = ./hwdef/glw.nix;
-          role = roles.workstation_light;
+          role = roles.workstation_xfce;
           extraModules = [
-            intel
             (
               { pkgs, ... }:
               {
+                services.xserver.videoDrivers = [ "nvidia" ];
+                hardware = {
+                  nvidia = {
+                    modesetting.enable = true;
+                    open = false;
+                    prime = {
+                      offload = {
+                        enable = true;
+                        enableOffloadCmd = true;
+                      };
+                      # Run `lspci | grep -E 'VGA|3D'` on glw and convert to PCI:<bus>:<slot>:<func>
+                      intelBusId = "PCI:0:2:0";
+                      nvidiaBusId = "PCI:1:0:0";
+                    };
+                  };
+                  graphics = {
+                    enable = true;
+                    enable32Bit = true;
+                  };
+                };
                 environment.systemPackages = [ pkgs.moonlight-qt ];
+                nixpkgs.overlays = [
+                  (final: prev:
+                    let
+                      inherit (prev) symlinkJoin makeWrapper;
+                      wrapGame = drv: bin:
+                        symlinkJoin {
+                          inherit (drv) name;
+                          paths = [ drv ];
+                          nativeBuildInputs = [ makeWrapper ];
+                          postBuild = ''
+                            wrapProgram $out/bin/${bin} \
+                              --run 'exec nvidia-offload ${final.gamemode}/bin/gamemoderun ${drv}/bin/${bin} "$@"'
+                          '';
+                        };
+                    in
+                    {
+                      heroic = wrapGame prev.heroic "heroic";
+                      vkquake = wrapGame prev.vkquake "vkquake";
+                      runelite = wrapGame prev.runelite "runelite";
+                    }
+                  )
+                ];
               }
             )
           ];

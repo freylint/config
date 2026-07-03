@@ -1,5 +1,11 @@
 # Features:
-# - System packages: dev (elm, rust), infra (nil LSP, awscli2, lightsailctl), eda, desktop (Signal, Discord, games)
+# - Dev tools: python3, neovim, git, gh, gnumake, gcc, rust (beta + rust-src + rust-analyzer), elm + elm-format, claude-code
+# - Infra tools: awscli2, lightsailctl (bundled binary derivation), jq, nil LSP, sops, age, ssh-to-age
+# - EDA / CAD tools: kicad, openscad, yosys
+# - Desktop: wezterm, signal-desktop, discord
+# - Games (wrapped per-host by flake overlay): heroic, vkquake, runelite
+# - Desktop utilities: catppuccin-papirus-folders, gnome-disk-utility, gparted
+# - Hardware diagnostics: pciutils
 { pkgs, ... }:
 let
   lightsailctl = pkgs.stdenvNoCC.mkDerivation {
@@ -49,5 +55,6 @@ in
     catppuccin-papirus-folders
     gnome-disk-utility
     gparted
+    pciutils
   ];
 }

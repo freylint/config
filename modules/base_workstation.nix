@@ -1,5 +1,11 @@
 # Features:
-# - Audio (pipewire), Docker, Bluetooth, SSH, printing, ntsync, gamemode, Flatpak (nix-flatpak, Bolt Launcher)
+# - Audio (pipewire + ALSA 32-bit + PulseAudio compat), Bluetooth (blueman)
+# - Docker, SSH, printing, NetworkManager, systemd-boot EFI bootloader
+# - Gaming: gamemode, Steam, ALVR VR, ntsync udev rule + kernel module (Linux 6.14+)
+# - Flatpak (nix-flatpak): flathub remote, com.adamcake.Bolt; network-online ordering workaround
+# - SOPS secrets (age via SSH host key), home-manager (global pkgs, backup on collision)
+# - Fonts: FiraCode Nerd Font; locale: en_US.UTF-8 / America/New_York
+# - Nix experimental features: nix-command, flakes; Zsh system shell
 # - System overlays, packages, WoL, gaming controllers via imports
 { pkgs, ... }: {
   imports = [

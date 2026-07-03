@@ -1,13 +1,13 @@
 # Features:
 # - workstation: KDE Plasma 6 desktop role
-# - workstation_light: Sway desktop role
+# - workstation_xfce: XFCE desktop role
 let
   base_workstation = import ./modules/base_workstation.nix;
   desktop = import ./modules/desktop.nix;
-  sway_desktop = import ./modules/sway_desktop.nix;
+  xfce_desktop = import ./modules/xfce_desktop.nix;
   users = import ./modules/users.nix;
   home = import ./modules/home/plasma.nix;
-  sway_home = import ./modules/home/sway.nix;
+  xfce_home = import ./modules/home/xfce.nix;
 
   workstation =
     {
@@ -32,7 +32,7 @@ let
       };
     };
 
-  workstation_light =
+  workstation_xfce =
     {
       lib,
       userNames,
@@ -42,15 +42,15 @@ let
     {
       imports = [
         base_workstation
-        sway_desktop
+        xfce_desktop
         users
       ];
       home-manager = {
         sharedModules = [ nixos-vscode-server.homeModules.default ];
-        users = lib.genAttrs userNames (_: sway_home);
+        users = lib.genAttrs userNames (_: xfce_home);
       };
     };
 in
 {
-  inherit workstation workstation_light;
+  inherit workstation workstation_xfce;
 }
