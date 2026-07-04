@@ -1,7 +1,7 @@
 # Features:
 # - Three NixOS hosts: glw (XFCE, local), batpc, homebase — deployed via nixos-rebuild
 # - glw: nixos-hardware common modules (Intel CPU microcode/VAAPI, laptop TLP, SSD fstrim); OpenRazer driver+daemon
-# - glw: game launcher scripts (heroic, vkquake, runelite) via nvidia-offload + gamemoderun
+# - glw: game launcher scripts (heroic, vkquake, runelite, bolt→runelite) via nvidia-offload + gamemoderun
 # - Dev shell with sops, age, ssh-to-age
 # - Docker container image (Node.js www SPA; Elm bundled via elm make + buildNpmPackage, port 8080)
 # - Nix formatter (nixfmt-tree)
@@ -287,6 +287,25 @@
                     }
                   )
                 ];
+                # Bolt launches RuneLite as a child process inside its Flatpak sandbox.
+                # Wrapping `flatpak run` with nvidia-offload/gamemoderun targets Bolt the
+                # launcher, not RuneLite: LD_PRELOAD from gamemoderun doesn't survive the
+                # sandbox boundary, and the gamemode library isn't present in the runtime.
+                # A system Flatpak override injects env vars before any process in the
+                # sandbox starts, so RuneLite's JVM inherits both the NVIDIA PRIME vars
+                # and libgamemodeauto. The filesystems grant makes the Nix store path
+                # readable inside the sandbox, which is otherwise blocked.
+                environment.etc."flatpak/overrides/com.adamcake.Bolt".text = ''
+                  [Environment]
+                  __NV_PRIME_RENDER_OFFLOAD=1
+                  __NV_PRIME_RENDER_OFFLOAD_PROVIDER=NVIDIA-G0
+                  __GLX_VENDOR_LIBRARY_NAME=nvidia
+                  __VK_LAYER_NV_optimus=NVIDIA_only
+                  LD_PRELOAD=${pkgs.gamemode}/lib/libgamemodeauto.so.0
+
+                  [Context]
+                  filesystems=${pkgs.gamemode}/lib:ro;
+                '';
               }
             )
           ];
