@@ -4,6 +4,7 @@
 # - glw: game launcher scripts (heroic, vkquake, runelite, bolt→runelite) via nvidia-offload + gamemoderun
 # - Dev shell with sops, age, ssh-to-age
 # - Docker container image (Node.js www SPA; Elm bundled via elm make + buildNpmPackage, port 8080)
+# - BDD test suite: unit (eval assertions) and integration (NixOS VM) via nix flake check
 # - Nix formatter (nixfmt-tree)
 # - virtual-display: local NixOS module sub-flake (pkg/virtual-display) providing AMD virtual display for homebase
 # - virtual-display-vm: QEMU test VM for the virtual-display module (nix run .#vdisp-vm; SSH :2222 root/root)
@@ -213,6 +214,8 @@
         ];
       };
 
+      checks.${system} = import ./modules/tests { inherit pkgs nixpkgs system; };
+
       formatter.${system} = pkgs.nixfmt-tree;
 
       apps.${system}.vdisp-vm = {
@@ -226,6 +229,13 @@
             { nixpkgs.hostPlatform = system; }
             virtual-display.nixosModules.default
             ./pkg/virtual-display/vm.nix
+            # nix flake check requires all nixosConfigurations to have a root fs and
+            # bootloader; this is only ever run via `nix run .#vdisp-vm` (vmVariant
+            # overrides at runtime), so a tmpfs root satisfies the check without effect.
+            {
+              boot.loader.grub.enable = false;
+              fileSystems."/" = { device = "none"; fsType = "tmpfs"; };
+            }
           ];
         };
 

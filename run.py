@@ -7,7 +7,7 @@ Task runner — interactive TUI or direct execution.
 
 Features:
   - Targets: deploy, deploy-hosts, deploy-local, collar, lightsail, rekey,
-             update, flake-update, lock, unlock, ss-dev, vdisp-test, vdisp-vm
+             update, flake-update, lock, unlock, ss-dev, vdisp-test, vdisp-vm, check
   - Deploy pipeline: WoL, hwdef, flake update, fmt, nixos-rebuild per host
   - Multi-address resolution per host: first reachable address selected at deploy time
   - AWS Lightsail container build and deploy (nix build → docker load → push → deploy)
@@ -64,6 +64,7 @@ TARGETS: list[Target] = [
     Target("ss-dev",       "Screensaver dev cycle: unlock → wait 5s → lock",         None),
     Target("vdisp-test",   "Check virtual display service and DRM state on homebase", None),
     Target("vdisp-vm",     "Build and run virtual-display test VM (SSH :2222 root/root)", None),
+    Target("check",        "Run BDD test suite: unit (eval) + integration (VM) via nix flake check", None),
 ]
 
 
@@ -317,6 +318,8 @@ def run_target(target: Target) -> int:
             return _vdisp_test()
         case "vdisp-vm":
             return _run(["nix", "run", "--impure", f"{NIXOS}#vdisp-vm"])
+        case "check":
+            return _run(["nix", "flake", "check", "--impure"], cwd=NIXOS)
         case _:
             cmd = target._cmd() if callable(target._cmd) else target._cmd
             if cmd is None:
