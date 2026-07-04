@@ -264,7 +264,7 @@
                     enable32Bit = true;
                   };
                 };
-                environment.systemPackages = [ pkgs.moonlight-qt ];
+                environment.systemPackages = [ pkgs.moonlight-qt pkgs.polychromatic ];
                 nixpkgs.overlays = [
                   (final: prev:
                     let

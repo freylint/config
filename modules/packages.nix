@@ -4,7 +4,7 @@
 # - EDA / CAD tools: kicad, openscad, yosys
 # - Desktop: wezterm, signal-desktop, discord
 # - Games (wrapped per-host by flake overlay): heroic, vkquake, runelite
-# - Desktop utilities: catppuccin-papirus-folders, gnome-disk-utility, gparted
+# - Desktop utilities: gnome-disk-utility, gparted
 # - Hardware diagnostics: pciutils
 { pkgs, ... }:
 let
@@ -52,7 +52,6 @@ in
     heroic
     vkquake
     runelite
-    catppuccin-papirus-folders
     gnome-disk-utility
     gparted
     pciutils
