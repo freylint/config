@@ -1,9 +1,9 @@
 # Self-tests for wincompat.nix
 # - Unit: system packages include bottles, wine-staging, winetricks; 32-bit graphics enabled
 # - Integration: wine, bottles, winetricks binaries present and functional in a NixOS VM
-{ pkgs, nixpkgs, system }:
+{ pkgs, nixpkgs, system, home-manager, nix-vscode-extensions }:
 let
-  inherit (import ./tests/lib.nix { inherit pkgs nixpkgs system; }) eval scenario vmBase;
+  inherit (import ./tests/lib.nix { inherit pkgs nixpkgs system home-manager nix-vscode-extensions; }) eval scenario vmBase;
   cfg = eval [ ./wincompat.nix ];
 in
   {

@@ -1,8 +1,8 @@
 # Self-tests for xfce_desktop.nix
 # - Unit: XFCE desktop and SDDM enabled, battery and whiskermenu plugins in system packages
-{ pkgs, nixpkgs, system }:
+{ pkgs, nixpkgs, system, home-manager, nix-vscode-extensions }:
 let
-  inherit (import ./tests/lib.nix { inherit pkgs nixpkgs system; }) eval scenario;
+  inherit (import ./tests/lib.nix { inherit pkgs nixpkgs system home-manager nix-vscode-extensions; }) eval scenario;
   cfg = eval [ ./xfce_desktop.nix ];
 in {
   xfce-desktop-enabled        = scenario "xfce-desktop-enabled"        cfg.services.xserver.desktopManager.xfce.enable;

@@ -1,5 +1,5 @@
 # Features:
-# - Dev tools: python3, neovim, git, gh, gnumake, gcc, rust (beta + rust-src + rust-analyzer), elm + elm-format, claude-code
+# - Dev tools: python3, neovim, git, gh, gnumake, gcc, rust (beta + rust-src + rust-analyzer), elm + elm-format, quarto, claude-code
 # - Infra tools: awscli2, lightsailctl (bundled binary derivation), jq, nil LSP, sops, age, ssh-to-age
 # - EDA / CAD tools: kicad, openscad, yosys
 # - Desktop: wezterm, signal-desktop, discord
@@ -35,6 +35,7 @@ in
     })
     elmPackages.elm
     elmPackages.elm-format
+    quarto
     claude-code
     awscli2
     lightsailctl

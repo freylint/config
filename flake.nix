@@ -214,7 +214,7 @@
         ];
       };
 
-      checks.${system} = import ./modules/tests { inherit pkgs nixpkgs system; };
+      checks.${system} = import ./modules/tests { inherit pkgs nixpkgs system home-manager nix-vscode-extensions; };
 
       formatter.${system} = pkgs.nixfmt-tree;
 

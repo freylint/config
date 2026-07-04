@@ -25,3 +25,4 @@ __pycache__/
 
 # Build artifacts
 **/result
+**/result-*

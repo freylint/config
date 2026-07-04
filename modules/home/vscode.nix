@@ -1,5 +1,5 @@
 # Features:
-# - VS Code: extensions, FiraCode, Catppuccin Mocha, SOPS, nil Nix LSP, vscodevim, elm-ls, test-adapter-converter
+# - VS Code: extensions, FiraCode, Catppuccin Mocha, SOPS, nil Nix LSP, vscodevim, elm-ls, quarto, test-adapter-converter
 { pkgs, lib, ... }: {
   # VS Code marks nix-managed extension versions as obsolete when the symlink layout
   # changes between home-manager generations; clear on each activation.
@@ -27,6 +27,7 @@
           slevesque.shader
           timgjones.hlsltools
           raczzalan.webgl-glsl-editor
+          quarto.quarto
         ]);
       userSettings = {
         "editor.fontFamily" = "'FiraCode Nerd Font', monospace";
