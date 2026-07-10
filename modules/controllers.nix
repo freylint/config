@@ -11,7 +11,7 @@ let
       owner = "Schmoller";
       repo = "pedalctl";
       rev = "502d0600e21f48d23dabc696a67ca82c343b0128";
-      hash = "sha256-0k5dfyj146dwm5ym1r14qccicdm5gh44vcicsg5lw85z177pbwzm=";
+      hash = "sha256-9fN1zwm/IE7L0yyyTQh8pTYWGcMk5FB9qbwZEqR3rUw=";
     };
     nativeBuildInputs = [ pkgs.cmake ];
     buildInputs = [ pkgs.libusb1 ];
