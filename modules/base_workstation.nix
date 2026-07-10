@@ -3,7 +3,6 @@
 # - Docker, SSH, printing, NetworkManager, systemd-boot EFI bootloader
 # - Gaming: gamemode, Steam, ALVR VR, ntsync udev rule + kernel module (Linux 6.14+)
 # - Windows compatibility: Bottles, Wine Staging, Winetricks (via wincompat)
-# - Flatpak (nix-flatpak): flathub remote, com.adamcake.Bolt; network-online ordering workaround
 # - SOPS secrets (age via SSH host key), home-manager (global pkgs, backup on collision)
 # - Fonts: FiraCode Nerd Font; locale: en_US.UTF-8 / America/New_York
 # - Nix: experimental features (nix-command, flakes), nixPath pinned to system nixpkgs (nix-shell -p); Zsh system shell
@@ -20,21 +19,6 @@
   security.rtkit.enable = true;
   virtualisation.docker.enable = true;
   services = {
-    flatpak = {
-      enable = true;
-      remotes = [
-        {
-          name = "flathub";
-          location = "https://dl.flathub.org/repo/flathub.flatpakrepo";
-        }
-      ];
-      packages = [
-        {
-          appId = "com.adamcake.Bolt";
-          origin = "flathub";
-        }
-      ];
-    };
     pulseaudio.enable = false;
     pipewire = {
       enable = true;
@@ -48,10 +32,6 @@
     printing.enable = true;
     openssh.enable = true;
     udev.extraRules = ''KERNEL=="ntsync", TAG+="uaccess"'';
-  };
-  systemd.services.flatpak-managed-install = {
-    wants = [ "network-online.target" ];
-    after = [ "network-online.target" ];
   };
   hardware.bluetooth.enable = true;
   boot = {

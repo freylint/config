@@ -1,14 +1,13 @@
 # Features:
 # - Three NixOS hosts: glw (XFCE, local), batpc, homebase — deployed via nixos-rebuild
 # - glw: nixos-hardware common modules (Intel CPU microcode/VAAPI, laptop TLP, SSD fstrim); OpenRazer driver+daemon
-# - glw: game launcher scripts (heroic, vkquake, runelite, bolt→runelite) via nvidia-offload + gamemoderun
+# - glw: game launcher scripts (heroic, vkquake, runelite, bolt-launcher) via gamemoderun; NVIDIA dGPU always-on (PRIME sync)
 # - Dev shell with sops, age, ssh-to-age
 # - Docker container image (Node.js www SPA; Elm bundled via elm make + buildNpmPackage, port 8080)
 # - BDD test suite: unit (eval assertions) and integration (NixOS VM) via nix flake check
 # - Nix formatter (nixfmt-tree)
 # - virtual-display: local NixOS module sub-flake (pkg/virtual-display) providing AMD virtual display for homebase
 # - virtual-display-vm: QEMU test VM for the virtual-display module (nix run .#vdisp-vm; SSH :2222 root/root)
-# - nix-flatpak: declarative Flatpak management; com.adamcake.Bolt installed on all hosts
 {
   description = "NixOS configuration";
 
@@ -43,7 +42,6 @@
       url = "github:Mic92/sops-nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    nix-flatpak.url = "github:gmodena/nix-flatpak";
     nixos-hardware.url = "github:NixOS/nixos-hardware";
 
     # Local sub-flake (pkg/virtual-display) consumed as a NixOS module only.
@@ -63,7 +61,6 @@
       rust-overlay,
       nixos-vscode-server,
       sops-nix,
-      nix-flatpak,
       nixos-hardware,
       virtual-display,
     }:
@@ -111,7 +108,6 @@
             hwconfig
             home-manager.nixosModules.home-manager
             sops-nix.nixosModules.sops
-            nix-flatpak.nixosModules.nix-flatpak
             role
             { networking.hostName = name; }
           ]
@@ -260,10 +256,7 @@
                     modesetting.enable = true;
                     open = false;
                     prime = {
-                      offload = {
-                        enable = true;
-                        enableOffloadCmd = true;
-                      };
+                      sync.enable = true;
                       # Run `lspci | grep -E 'VGA|3D'` on glw and convert to PCI:<bus>:<slot>:<func>
                       intelBusId = "PCI:0:2:0";
                       nvidiaBusId = "PCI:1:0:0";
@@ -286,7 +279,7 @@
                           nativeBuildInputs = [ makeWrapper ];
                           postBuild = ''
                             wrapProgram $out/bin/${bin} \
-                              --run 'exec nvidia-offload ${final.gamemode}/bin/gamemoderun ${drv}/bin/${bin} "$@"'
+                              --run 'exec ${final.gamemode}/bin/gamemoderun ${drv}/bin/${bin} "$@"'
                           '';
                         };
                     in
@@ -294,28 +287,10 @@
                       heroic = wrapGame prev.heroic "heroic";
                       vkquake = wrapGame prev.vkquake "vkquake";
                       runelite = wrapGame prev.runelite "runelite";
+                      bolt-launcher = wrapGame prev.bolt-launcher "bolt-launcher";
                     }
                   )
                 ];
-                # Bolt launches RuneLite as a child process inside its Flatpak sandbox.
-                # Wrapping `flatpak run` with nvidia-offload/gamemoderun targets Bolt the
-                # launcher, not RuneLite: LD_PRELOAD from gamemoderun doesn't survive the
-                # sandbox boundary, and the gamemode library isn't present in the runtime.
-                # A system Flatpak override injects env vars before any process in the
-                # sandbox starts, so RuneLite's JVM inherits both the NVIDIA PRIME vars
-                # and libgamemodeauto. The filesystems grant makes the Nix store path
-                # readable inside the sandbox, which is otherwise blocked.
-                environment.etc."flatpak/overrides/com.adamcake.Bolt".text = ''
-                  [Environment]
-                  __NV_PRIME_RENDER_OFFLOAD=1
-                  __NV_PRIME_RENDER_OFFLOAD_PROVIDER=NVIDIA-G0
-                  __GLX_VENDOR_LIBRARY_NAME=nvidia
-                  __VK_LAYER_NV_optimus=NVIDIA_only
-                  LD_PRELOAD=${pkgs.gamemode}/lib/libgamemodeauto.so.0
-
-                  [Context]
-                  filesystems=${pkgs.gamemode}/lib:ro;
-                '';
               }
             )
           ];
