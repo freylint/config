@@ -12,6 +12,7 @@
   imports = [
     ./overlays.nix
     ./packages.nix
+    ./quarto.nix
     ./wake_on_lan.nix
     ./controllers.nix
     ./wincompat.nix

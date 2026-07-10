@@ -9,6 +9,7 @@
     ./gtk.nix
     ./home_sops.nix
     ./vscode.nix
+    ./quarto.nix
     ./flatpak_profile.nix
   ];
   wezterm_cfg = {
