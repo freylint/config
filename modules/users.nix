@@ -1,5 +1,5 @@
 # Features:
-# - Normal users with wheel/docker/networkmanager/input groups, admin SSH keys, kate
+# - Normal users with wheel/docker/networkmanager/input/libvirtd groups, admin SSH keys, kate
 {
   lib,
   pkgs,
@@ -16,6 +16,7 @@ let
       "wheel"
       "docker"
       "input"
+      "libvirtd"
     ];
     shell = pkgs.zsh;
     openssh.authorizedKeys.keys = adminKeys;
