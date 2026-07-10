@@ -1,0 +1,5 @@
+# Quarto Artifacts
+**/notes_files
+/.quarto/
+**/*.quarto_ipynb
+notes.html
