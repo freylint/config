@@ -40,6 +40,7 @@ HOSTS: dict[str, dict] = {
     "glw":      {"hosts": ["glw.lan"],                 "user": "gen", "mac": None, "local": True},
     "batpc":    {"hosts": ["batpc.lan"],                "user": "bat", "mac": None, "local": False},
     "homebase": {"hosts": ["homebase.freyground.com"],  "user": "gen", "mac": None, "local": False},
+    "battop":   {"hosts": ["battop.lan"],                "user": "bat", "mac": None, "local": False},
 }
 
 
@@ -296,7 +297,10 @@ def run_target(target: Target) -> int:
             hosts = [h.strip() for h in os.environ.get("DEPLOY_HOSTS", "").split(",") if h.strip()]
             return _pipeline(on=hosts or None)
         case "deploy-local":
-            return _nixos_rebuild("glw")
+            return _nixos_rebuild(
+                socket.gethostname(),
+                target_addr=None,
+            )
         case "collar":
             return _run(["nix", "build", ".#default"], cwd=COLLAR)
         case "lightsail":

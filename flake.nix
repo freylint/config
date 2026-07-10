@@ -1,5 +1,5 @@
 # Features:
-# - Three NixOS hosts: glw (XFCE, local), batpc, homebase — deployed via nixos-rebuild
+# - Four NixOS hosts: glw (XFCE, local), batpc, battop, homebase — deployed via nixos-rebuild
 # - glw: nixos-hardware common modules (Intel CPU microcode/VAAPI, laptop TLP, SSD fstrim); OpenRazer driver+daemon
 # - glw: game launcher scripts (heroic, vkquake, runelite, bolt-launcher) via gamemoderun; NVIDIA dGPU always-on (PRIME sync)
 # - Dev shell with sops, age, ssh-to-age
@@ -320,6 +320,21 @@
               };
               environment.systemPackages = batpcPackages;
             }
+          ];
+        };
+
+        battop = mkHost {
+          name = "battop";
+          hwconfig = ./hwdef/battop.nix;
+          extraModules = [
+            {
+              services.xserver.videoDrivers = [ "modesetting" ];
+              boot.initrd.kernelModules = [ "i915" ];
+              hardware.graphics = {
+                enable = true;
+                enable32Bit = true;
+              };
+             environment.systemPackages = batpcPackages;}
           ];
         };
 
