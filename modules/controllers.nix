@@ -13,9 +13,14 @@ let
       rev = "502d0600e21f48d23dabc696a67ca82c343b0128";
       hash = "sha256-9fN1zwm/IE7L0yyyTQh8pTYWGcMk5FB9qbwZEqR3rUw=";
     };
+    postPatch = ''
+      for f in src/devices/ikkegol_protocol.hpp src/devices/ikkegol_capabilities.hpp src/utils/usb_scancodes.hpp; do
+        substituteInPlace $f --replace-fail "#pragma once" $'#pragma once\n#include <cstdint>'
+      done
+    '';
     nativeBuildInputs = [ pkgs.cmake ];
     buildInputs = [ pkgs.libusb1 ];
-    cmakeFlags = [ "-DINSTALL_UDEV_RULES=OFF" ];
+    cmakeFlags = [ "-DINSTALL_UDEV_RULES=OFF" "-DCMAKE_POLICY_VERSION_MINIMUM=3.5" ];
   };
 in
 {
