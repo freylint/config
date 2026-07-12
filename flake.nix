@@ -124,6 +124,30 @@
 
       batpcPackages = with pkgs; [ prismlauncher ];
 
+      batpcPackageOverlays = [
+        (final: prev:
+          let
+            inherit (prev) symlinkJoin makeWrapper;
+            wrapGame = drv: bin:
+              symlinkJoin {
+                inherit (drv) name;
+                paths = [ drv ];
+                nativeBuildInputs = [ makeWrapper ];
+                postBuild = ''
+                  wrapProgram $out/bin/${bin} \
+                    --run 'exec ${final.gamemode}/bin/gamemoderun ${drv}/bin/${bin} "$@"'
+                '';
+              };
+          in
+          {
+            heroic = wrapGame prev.heroic "heroic";
+            vkquake = wrapGame prev.vkquake "vkquake";
+            runelite = wrapGame prev.runelite "runelite";
+            bolt-launcher = wrapGame prev.bolt-launcher "bolt-launcher";
+          }
+        )
+      ];
+
       vdispVm = self.nixosConfigurations.virtual-display-vm.config.system.build.vm;
       containerPort = 8080; # Lightsail LB terminates TLS; container speaks plain HTTP
       # Fixed-output derivation: fetches elm packages (elm/browser, elm/core, elm/html + transitive deps).
@@ -319,6 +343,7 @@
                 };
               };
               environment.systemPackages = batpcPackages;
+              nixpkgs.overlays = batpcPackageOverlays;
             }
           ];
         };
@@ -334,7 +359,9 @@
                 enable = true;
                 enable32Bit = true;
               };
-             environment.systemPackages = batpcPackages;}
+              environment.systemPackages = batpcPackages;
+              nixpkgs.overlays = batpcPackageOverlays;
+            }
           ];
         };
 
