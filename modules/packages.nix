@@ -3,7 +3,7 @@
 # - Infra tools: awscli2, lightsailctl (bundled binary derivation), jq, nil LSP, sops, age, ssh-to-age
 # - EDA / CAD tools: kicad, openscad, yosys
 # - Desktop: wezterm, signal-desktop, discord
-# - Games (wrapped per-host by flake overlay): heroic, vkquake, runelite, bolt-launcher
+# - Games (wrapped per-host by flake overlay): heroic, vkquake, runelite, bolt-launcher; lutris
 # - Desktop utilities: gnome-disk-utility, gparted
 # - Hardware diagnostics: pciutils
 { pkgs, ... }:
@@ -53,6 +53,7 @@ in
     vkquake
     runelite
     bolt-launcher
+    lutris
     gnome-disk-utility
     gparted
     pciutils
