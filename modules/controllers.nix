@@ -20,7 +20,10 @@ let
     '';
     nativeBuildInputs = [ pkgs.cmake ];
     buildInputs = [ pkgs.libusb1 ];
-    cmakeFlags = [ "-DINSTALL_UDEV_RULES=OFF" "-DCMAKE_POLICY_VERSION_MINIMUM=3.5" ];
+    cmakeFlags = [
+      "-DINSTALL_UDEV_RULES=OFF"
+      "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
+    ];
   };
 in
 {

@@ -4,11 +4,20 @@
 { pkgs, ... }:
 {
   nixpkgs.overlays = [
-    (final: prev:
+    (
+      final: prev:
       let
-        pythonEnv = prev.python3.withPackages (ps: with ps; [
-          ipykernel jupyter-client nbclient nbformat matplotlib numpy pyyaml
-        ]);
+        pythonEnv = prev.python3.withPackages (
+          ps: with ps; [
+            ipykernel
+            jupyter-client
+            nbclient
+            nbformat
+            matplotlib
+            numpy
+            pyyaml
+          ]
+        );
         quartoPatched = prev.quarto.overrideAttrs (old: {
           postFixup = (old.postFixup or "") + ''
             substituteInPlace $out/bin/quarto.js \

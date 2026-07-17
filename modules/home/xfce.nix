@@ -13,7 +13,12 @@ let
     vkquakeEntry
     ;
 in
-{ config, pkgs, lib, ... }:
+{
+  config,
+  pkgs,
+  lib,
+  ...
+}:
 let
   nixosSnowflakeCatppuccin = pkgs.runCommand "nix-snowflake-catppuccin-mauve.svg" { } ''
     sed \
@@ -72,7 +77,12 @@ let
   '';
 
   wallpaper = pkgs.runCommand "catppuccin-mocha-mauve-fractal.png" {
-    buildInputs = [ (pkgs.python3.withPackages (ps: [ ps.numpy ps.pillow ])) ];
+    buildInputs = [
+      (pkgs.python3.withPackages (ps: [
+        ps.numpy
+        ps.pillow
+      ]))
+    ];
   } "python3 ${fractalScript} \"$out\"";
 
   showdesktopCatppuccin = pkgs.runCommand "org.xfce.panel.showdesktop.svg" { } ''
@@ -96,8 +106,10 @@ in
   xdg.desktopEntries.vkquake = vkquakeEntry config;
 
   home.file = {
-    ".local/share/icons/hicolor/scalable/apps/org.xfce.panel.whiskermenu.svg".source = nixosSnowflakeCatppuccin;
-    ".local/share/icons/hicolor/scalable/apps/org.xfce.panel.showdesktop.svg".source = showdesktopCatppuccin;
+    ".local/share/icons/hicolor/scalable/apps/org.xfce.panel.whiskermenu.svg".source =
+      nixosSnowflakeCatppuccin;
+    ".local/share/icons/hicolor/scalable/apps/org.xfce.panel.showdesktop.svg".source =
+      showdesktopCatppuccin;
   };
 
   xdg.configFile = {
@@ -124,96 +136,96 @@ in
     "xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml" = {
       force = true;
       text = ''
-      <?xml version="1.0" encoding="UTF-8"?>
-      <channel name="xfwm4" version="1.0">
-        <property name="general" type="empty">
-          <property name="theme" type="string" value="catppuccin-mocha-mauve-standard"/>
-        </property>
-      </channel>
-    '';
+        <?xml version="1.0" encoding="UTF-8"?>
+        <channel name="xfwm4" version="1.0">
+          <property name="general" type="empty">
+            <property name="theme" type="string" value="catppuccin-mocha-mauve-standard"/>
+          </property>
+        </channel>
+      '';
     };
 
     "xfce4/xfconf/xfce-perchannel-xml/xfce4-panel.xml" = {
       force = true;
       text = ''
-      <?xml version="1.0" encoding="UTF-8"?>
-      <channel name="xfce4-panel" version="1.0">
-        <property name="configver" type="int" value="2"/>
-        <property name="panels" type="array">
-          <value type="int" value="1"/>
-          <property name="panel-1" type="empty">
-            <property name="position" type="string" value="p=1;x=9999;y=540"/>
-            <property name="length" type="uint" value="100"/>
-            <property name="position-locked" type="bool" value="true"/>
-            <property name="mode" type="uint" value="1"/>
-            <property name="size" type="uint" value="48"/>
-            <property name="background-style" type="uint" value="1"/>
-            <property name="background-rgba" type="string" value="#1e1e2eff"/>
-            <property name="plugin-ids" type="array">
-              <value type="int" value="1"/>
-              <value type="int" value="2"/>
-              <value type="int" value="3"/>
-              <value type="int" value="4"/>
-              <value type="int" value="7"/>
-              <value type="int" value="5"/>
-              <value type="int" value="6"/>
+        <?xml version="1.0" encoding="UTF-8"?>
+        <channel name="xfce4-panel" version="1.0">
+          <property name="configver" type="int" value="2"/>
+          <property name="panels" type="array">
+            <value type="int" value="1"/>
+            <property name="panel-1" type="empty">
+              <property name="position" type="string" value="p=1;x=9999;y=540"/>
+              <property name="length" type="uint" value="100"/>
+              <property name="position-locked" type="bool" value="true"/>
+              <property name="mode" type="uint" value="1"/>
+              <property name="size" type="uint" value="48"/>
+              <property name="background-style" type="uint" value="1"/>
+              <property name="background-rgba" type="string" value="#1e1e2eff"/>
+              <property name="plugin-ids" type="array">
+                <value type="int" value="1"/>
+                <value type="int" value="2"/>
+                <value type="int" value="3"/>
+                <value type="int" value="4"/>
+                <value type="int" value="7"/>
+                <value type="int" value="5"/>
+                <value type="int" value="6"/>
+              </property>
             </property>
           </property>
-        </property>
-        <property name="plugins" type="empty">
-          <property name="plugin-1" type="string" value="whiskermenu"/>
-          <property name="plugin-2" type="string" value="tasklist">
-            <property name="grouping" type="uint" value="1"/>
-            <property name="show-labels" type="bool" value="false"/>
+          <property name="plugins" type="empty">
+            <property name="plugin-1" type="string" value="whiskermenu"/>
+            <property name="plugin-2" type="string" value="tasklist">
+              <property name="grouping" type="uint" value="1"/>
+              <property name="show-labels" type="bool" value="false"/>
+            </property>
+            <property name="plugin-3" type="string" value="separator">
+              <property name="expand" type="bool" value="true"/>
+              <property name="style" type="uint" value="0"/>
+            </property>
+            <property name="plugin-4" type="string" value="systray">
+              <property name="square-icons" type="bool" value="true"/>
+            </property>
+            <property name="plugin-5" type="string" value="clock">
+              <property name="mode" type="uint" value="2"/>
+              <property name="digital-layout" type="uint" value="1"/>
+              <property name="digital-time-format" type="string" value="%H:%M"/>
+              <property name="digital-date-format" type="string" value="%m/%d"/>
+              <property name="rotate-vertically" type="bool" value="false"/>
+            </property>
+            <property name="plugin-7" type="string" value="battery"/>
+            <property name="plugin-6" type="string" value="showdesktop"/>
           </property>
-          <property name="plugin-3" type="string" value="separator">
-            <property name="expand" type="bool" value="true"/>
-            <property name="style" type="uint" value="0"/>
-          </property>
-          <property name="plugin-4" type="string" value="systray">
-            <property name="square-icons" type="bool" value="true"/>
-          </property>
-          <property name="plugin-5" type="string" value="clock">
-            <property name="mode" type="uint" value="2"/>
-            <property name="digital-layout" type="uint" value="1"/>
-            <property name="digital-time-format" type="string" value="%H:%M"/>
-            <property name="digital-date-format" type="string" value="%m/%d"/>
-            <property name="rotate-vertically" type="bool" value="false"/>
-          </property>
-          <property name="plugin-7" type="string" value="battery"/>
-          <property name="plugin-6" type="string" value="showdesktop"/>
-        </property>
-      </channel>
-    '';
+        </channel>
+      '';
     };
   };
 
   home.activation.xfceSetup = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-    ${pkgs.gtk3}/bin/gtk-update-icon-cache -qft \
-      ${config.home.homeDirectory}/.local/share/icons/hicolor 2>/dev/null || true
-    mkdir -p "${config.home.homeDirectory}/.config/xfce4/panel"
-    cat > "${config.home.homeDirectory}/.config/xfce4/panel/battery-7.rc" << 'EOF'
-display_label=false
-display_icon=true
-display_power=false
-display_percentage=true
-display_bar=false
-display_time=true
-tooltip_display_percentage=true
-tooltip_display_time=true
-low_percentage=10
-critical_percentage=5
-action_on_low=1
-action_on_critical=1
-hide_when_full=0
-colorA=rgb(203,166,247)
-colorH=rgb(166,227,161)
-colorL=rgb(249,226,175)
-colorC=rgb(243,139,168)
-command_on_low=
-command_on_critical=
-EOF
-    xfce4-panel --restart 2>/dev/null || true
+        ${pkgs.gtk3}/bin/gtk-update-icon-cache -qft \
+          ${config.home.homeDirectory}/.local/share/icons/hicolor 2>/dev/null || true
+        mkdir -p "${config.home.homeDirectory}/.config/xfce4/panel"
+        cat > "${config.home.homeDirectory}/.config/xfce4/panel/battery-7.rc" << 'EOF'
+    display_label=false
+    display_icon=true
+    display_power=false
+    display_percentage=true
+    display_bar=false
+    display_time=true
+    tooltip_display_percentage=true
+    tooltip_display_time=true
+    low_percentage=10
+    critical_percentage=5
+    action_on_low=1
+    action_on_critical=1
+    hide_when_full=0
+    colorA=rgb(203,166,247)
+    colorH=rgb(166,227,161)
+    colorL=rgb(249,226,175)
+    colorC=rgb(243,139,168)
+    command_on_low=
+    command_on_critical=
+    EOF
+        xfce4-panel --restart 2>/dev/null || true
   '';
 
   home.stateVersion = "26.05";
