@@ -50,6 +50,7 @@ in
     discord
     signal-desktop
     proton-vpn
+    qbittorrent
     heroic
     vkquake
     runelite
