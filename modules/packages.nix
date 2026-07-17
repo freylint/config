@@ -4,7 +4,7 @@
 # - EDA / CAD tools: kicad, openscad, yosys
 # - Desktop: wezterm, signal-desktop, discord
 # - Games (wrapped per-host by flake overlay): heroic, vkquake, runelite, bolt-launcher; lutris
-# - Desktop utilities: gnome-disk-utility, gparted
+# - Desktop utilities: gnome-disk-utility, gparted, peazip
 # - Hardware diagnostics: pciutils
 { pkgs, ... }:
 let
@@ -56,6 +56,7 @@ in
     lutris
     gnome-disk-utility
     gparted
+    peazip
     pciutils
   ];
 }
