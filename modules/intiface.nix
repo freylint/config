@@ -1,5 +1,5 @@
 # Features:
-# - Intiface Central: Buttplug.io device server (Bluetooth LE + USB toy control)
+# - Intiface Central: Bluetooth LE / USB peripheral device server
 { pkgs, ... }: {
   environment.systemPackages = [ pkgs.intiface-central ];
 }
