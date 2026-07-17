@@ -1,0 +1,56 @@
+---
+title: Notes
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    theme: catppuccin-mocha.scss
+---
+
+# General
+
+# Tech
+
+# Books
+
+## Workflow Modelling - Sharp McDermot - 1-58053-021-4
+
+## Why We Had to Write This Book
+
+### Fosdick's Publicity–Usability Curve
+
+As design effort shifts toward marketability the real-world friction for the user increases — highly publicised products tend toward low usability, and the most usable tools are often invisible.
+
+
+```{python}
+#| echo: false
+import numpy as np
+import matplotlib.pyplot as plt
+
+BG, FG, SURFACE = '#1e1e2e', '#cdd6f4', '#313244'
+BLUE, MAUVE = '#89b4fa', '#cba6f7'
+
+fig, ax = plt.subplots(figsize=(8, 4.3), facecolor=BG)
+ax.set_facecolor(BG)
+
+u = np.linspace(0, 10, 300)
+ax.plot(u, 10 * np.exp(-0.35 * u), color=BLUE, linewidth=1.5, alpha=0.25)
+
+u_pts = np.linspace(0.4, 9.5, 9)
+dpdu = -3.5 * np.exp(-0.35 * u_pts)
+lengths = np.sqrt(1 + dpdu**2)
+scale = 1.1
+ax.quiver(u_pts, 10 * np.exp(-0.35 * u_pts),
+          scale / lengths, scale * dpdu / lengths,
+          color=MAUVE, angles='xy', scale_units='xy', scale=1,
+          width=0.005, headwidth=5, headlength=6)
+
+ax.set(xlabel='Usability →', ylabel='↑ Publicity',
+       title='Publicity Vector', xlim=(0, 10), ylim=(0, 10))
+for item in [ax.title, ax.xaxis.label, ax.yaxis.label]: item.set_color(FG)
+ax.tick_params(colors=FG)
+for s in ax.spines.values(): s.set_edgecolor(SURFACE)
+ax.grid(color=SURFACE, linewidth=0.5, alpha=0.5)
+plt.tight_layout()
+plt.show()
+```

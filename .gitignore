@@ -17,6 +17,7 @@ Cargo.lock
 # Node / npm
 node_modules/
 dist/
+**/elm-stuff
 
 # Python
 *.pyc
@@ -24,3 +25,4 @@ __pycache__/
 
 # Build artifacts
 **/result
+**/result-*

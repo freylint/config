@@ -1,0 +1,62 @@
+/*-- scss:defaults --*/
+
+// Catppuccin Mocha palette
+$base:     #1e1e2e;
+$mantle:   #181825;
+$crust:    #11111b;
+$surface0: #313244;
+$surface1: #45475a;
+$surface2: #585b70;
+$overlay1: #7f849c;
+$subtext1: #bac2de;
+$text:     #cdd6f4;
+$mauve:    #cba6f7;
+$blue:     #89b4fa;
+$green:    #a6e3a1;
+$yellow:   #f9e2af;
+$peach:    #fab387;
+$red:      #f38ba8;
+
+$body-bg:            $base;
+$body-color:         $text;
+$link-color:         $blue;
+$link-hover-color:   $mauve;
+
+$font-family-base:   "'FiraCode Nerd Font', monospace";
+$font-family-code:   "'FiraCode Nerd Font', monospace";
+
+$headings-color:     $subtext1;
+
+$border-color:       $surface1;
+$card-bg:            $mantle;
+$card-border-color:  $surface0;
+
+$code-bg:            $mantle;
+$code-color:         $peach;
+
+$pre-bg:             $mantle;
+
+$input-bg:           $surface0;
+$input-color:        $text;
+$input-border-color: $surface1;
+
+$table-color:        $text;
+$table-border-color: $surface1;
+$table-striped-bg:   $surface0;
+
+$navbar-bg:          $mantle;
+$navbar-fg:          $text;
+$navbar-hl:          $mauve;
+
+$sidebar-bg:         $mantle;
+$sidebar-fg:         $text;
+$sidebar-hl:         $mauve;
+
+$footer-bg:          $crust;
+$footer-fg:          $overlay1;
+
+/*-- scss:rules --*/
+
+.navbar { border-bottom: 1px solid $surface0; }
+.sidebar { border-right: 1px solid $surface0; }
+blockquote { border-left: 3px solid $mauve; background: $surface0; padding: .5em 1em; }

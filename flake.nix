@@ -1,18 +1,20 @@
 # Features:
-# - Three NixOS hosts: glw (local), batpc, homebase — deployed via colmena
-# - Dev shell with colmena, sops, age, ssh-to-age
+# - Four NixOS hosts: glw (XFCE, local), batpc, battop, homebase — deployed via nixos-rebuild
+# - glw: nixos-hardware common modules (Intel CPU microcode/VAAPI, laptop TLP, SSD fstrim); OpenRazer driver+daemon
+# - glw: game launcher scripts (heroic, vkquake, runelite, bolt-launcher) via gamemoderun; NVIDIA dGPU always-on (PRIME sync)
+# - Dev shell with sops, age, ssh-to-age
 # - Docker container image (Node.js www SPA; Elm bundled via elm make + buildNpmPackage, port 8080)
+# - BDD test suite: unit (eval assertions) and integration (NixOS VM) via nix flake check
 # - Nix formatter (nixfmt-tree)
 # - virtual-display: local NixOS module sub-flake (pkg/virtual-display) providing AMD virtual display for homebase
 # - virtual-display-vm: QEMU test VM for the virtual-display module (nix run .#vdisp-vm; SSH :2222 root/root)
-# - Per-host targetHost override via COLMENA_HOST_<name> env var (multi-address support; requires --impure)
 {
   description = "NixOS configuration";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
     home-manager = {
-      url = "github:nix-community/home-manager/release-25.11";
+      url = "github:nix-community/home-manager/release-26.05";
       inputs.nixpkgs.follows = "nixpkgs";
     };
     nix-vscode-extensions = {
@@ -40,6 +42,7 @@
       url = "github:Mic92/sops-nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    nixos-hardware.url = "github:NixOS/nixos-hardware";
 
     # Local sub-flake (pkg/virtual-display) consumed as a NixOS module only.
     # Has no external inputs, so no `inputs.nixpkgs.follows` is needed.
@@ -58,6 +61,7 @@
       rust-overlay,
       nixos-vscode-server,
       sops-nix,
+      nixos-hardware,
       virtual-display,
     }:
     let
@@ -77,34 +81,37 @@
         "bat"
       ];
 
-      mods = import ./modules.nix;
+      roles = import ./roles.nix;
+
+      specialArgs = {
+        inherit
+          adminKeys
+          userNames
+          plasma-manager
+          nixos-vscode-server
+          nur
+          rust-overlay
+          nix-vscode-extensions
+          ;
+      };
 
       mkHost =
         {
           name,
           hwconfig,
-          deployment,
+          role ? roles.workstation,
           extraModules ? [ ],
         }:
-        { ... }:
-        let
-          envHost = builtins.getEnv "COLMENA_HOST_${name}";
-          resolvedDeployment =
-            if deployment.targetHost != null && envHost != "" then
-              deployment // { targetHost = envHost; }
-            else
-              deployment;
-        in
-        {
-          imports = [
+        nixpkgs.lib.nixosSystem {
+          inherit specialArgs;
+          modules = [
             hwconfig
             home-manager.nixosModules.home-manager
             sops-nix.nixosModules.sops
-            mods.workstation
+            role
+            { networking.hostName = name; }
           ]
           ++ extraModules;
-          networking.hostName = name;
-          deployment = resolvedDeployment;
         };
 
       amdgpu = {
@@ -116,6 +123,30 @@
       };
 
       batpcPackages = with pkgs; [ prismlauncher ];
+
+      batpcPackageOverlays = [
+        (final: prev:
+          let
+            inherit (prev) symlinkJoin makeWrapper;
+            wrapGame = drv: bin:
+              symlinkJoin {
+                inherit (drv) name;
+                paths = [ drv ];
+                nativeBuildInputs = [ makeWrapper ];
+                postBuild = ''
+                  wrapProgram $out/bin/${bin} \
+                    --run 'exec ${final.gamemode}/bin/gamemoderun ${drv}/bin/${bin} "$@"'
+                '';
+              };
+          in
+          {
+            heroic = wrapGame prev.heroic "heroic";
+            vkquake = wrapGame prev.vkquake "vkquake";
+            runelite = wrapGame prev.runelite "runelite";
+            bolt-launcher = wrapGame prev.bolt-launcher "bolt-launcher";
+          }
+        )
+      ];
 
       vdispVm = self.nixosConfigurations.virtual-display-vm.config.system.build.vm;
       containerPort = 8080; # Lightsail LB terminates TLS; container speaks plain HTTP
@@ -197,62 +228,93 @@
 
       devShells.${system}.default = pkgs.mkShell {
         packages = with pkgs; [
-          colmena
           sops
           age
           ssh-to-age
         ];
       };
 
-      formatter.${system} = pkgs.nixfmt-tree;
+      checks.${system} = import ./modules/tests { inherit pkgs nixpkgs system home-manager nix-vscode-extensions; };
 
-      nixosConfigurations.virtual-display-vm = nixpkgs.lib.nixosSystem {
-        inherit system;
-        modules = [
-          virtual-display.nixosModules.default
-          ./pkg/virtual-display/vm.nix
-        ];
-      };
+      formatter.${system} = pkgs.nixfmt-tree;
 
       apps.${system}.vdisp-vm = {
         type = "app";
         program = nixpkgs.lib.getExe vdispVm;
       };
 
-      colmena = {
-        meta = {
-          nixpkgs = pkgs;
-          specialArgs = {
-            inherit
-              adminKeys
-              userNames
-              plasma-manager
-              nixos-vscode-server
-              nur
-              rust-overlay
-              nix-vscode-extensions
-              ;
-          };
-        };
-
-        defaults.deployment = {
-          buildOnTarget = true;
-          targetUser = "root";
+      nixosConfigurations = {
+        virtual-display-vm = nixpkgs.lib.nixosSystem {
+          modules = [
+            { nixpkgs.hostPlatform = system; }
+            virtual-display.nixosModules.default
+            ./pkg/virtual-display/vm.nix
+            # nix flake check requires all nixosConfigurations to have a root fs and
+            # bootloader; this is only ever run via `nix run .#vdisp-vm` (vmVariant
+            # overrides at runtime), so a tmpfs root satisfies the check without effect.
+            {
+              boot.loader.grub.enable = false;
+              fileSystems."/" = { device = "none"; fsType = "tmpfs"; };
+            }
+          ];
         };
 
         glw = mkHost {
           name = "glw";
           hwconfig = ./hwdef/glw.nix;
-          deployment = {
-            targetHost = null;
-            allowLocalDeployment = true;
-          };
+          role = roles.workstation_xfce;
           extraModules = [
-            amdgpu
+            nixos-hardware.nixosModules.common-cpu-intel
+            nixos-hardware.nixosModules.common-pc-laptop
+            nixos-hardware.nixosModules.common-pc-ssd
             (
               { pkgs, ... }:
               {
-                environment.systemPackages = [ pkgs.moonlight-qt ];
+                services.xserver.videoDrivers = [ "nvidia" ];
+                hardware = {
+                  openrazer = {
+                    enable = true;
+                    users = userNames;
+                  };
+                  nvidia = {
+                    modesetting.enable = true;
+                    open = false;
+                    prime = {
+                      sync.enable = true;
+                      # Run `lspci | grep -E 'VGA|3D'` on glw and convert to PCI:<bus>:<slot>:<func>
+                      intelBusId = "PCI:0:2:0";
+                      nvidiaBusId = "PCI:1:0:0";
+                    };
+                  };
+                  graphics = {
+                    enable = true;
+                    enable32Bit = true;
+                  };
+                };
+                environment.systemPackages = [ pkgs.moonlight-qt pkgs.polychromatic ];
+                nixpkgs.overlays = [
+                  (final: prev:
+                    let
+                      inherit (prev) symlinkJoin makeWrapper;
+                      wrapGame = drv: bin:
+                        symlinkJoin {
+                          inherit (drv) name;
+                          paths = [ drv ];
+                          nativeBuildInputs = [ makeWrapper ];
+                          postBuild = ''
+                            wrapProgram $out/bin/${bin} \
+                              --run 'exec ${final.gamemode}/bin/gamemoderun ${drv}/bin/${bin} "$@"'
+                          '';
+                        };
+                    in
+                    {
+                      heroic = wrapGame prev.heroic "heroic";
+                      vkquake = wrapGame prev.vkquake "vkquake";
+                      runelite = wrapGame prev.runelite "runelite";
+                      bolt-launcher = wrapGame prev.bolt-launcher "bolt-launcher";
+                    }
+                  )
+                ];
               }
             )
           ];
@@ -261,15 +323,12 @@
         batpc = mkHost {
           name = "batpc";
           # Prefer an existing local hardware configuration on the host itself.
+          # Requires --impure when evaluated remotely.
           hwconfig =
             if builtins.pathExists /etc/nixos/hardware-configuration.nix then
               /etc/nixos/hardware-configuration.nix
             else
               ./hwdef/batpc.nix;
-          deployment = {
-            targetHost = "batpc.lan";
-            allowLocalDeployment = true;
-          };
           extraModules = [
             {
               services.xserver.videoDrivers = [ "nvidia" ];
@@ -284,6 +343,24 @@
                 };
               };
               environment.systemPackages = batpcPackages;
+              nixpkgs.overlays = batpcPackageOverlays;
+            }
+          ];
+        };
+
+        battop = mkHost {
+          name = "battop";
+          hwconfig = ./hwdef/battop.nix;
+          extraModules = [
+            {
+              services.xserver.videoDrivers = [ "modesetting" ];
+              boot.initrd.kernelModules = [ "i915" ];
+              hardware.graphics = {
+                enable = true;
+                enable32Bit = true;
+              };
+              environment.systemPackages = batpcPackages;
+              nixpkgs.overlays = batpcPackageOverlays;
             }
           ];
         };
@@ -291,10 +368,6 @@
         homebase = mkHost {
           name = "homebase";
           hwconfig = ./hwdef/homebase.nix;
-          deployment = {
-            targetHost = "homebase.freyground.com";
-            allowLocalDeployment = true;
-          };
           extraModules = [
             amdgpu
             # virtual-display.nixosModules.default
