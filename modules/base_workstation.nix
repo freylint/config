@@ -4,6 +4,7 @@
 # - Gaming: gamemode, Steam, ALVR VR, ntsync udev rule + kernel module (Linux 6.14+)
 # - Virtualisation: KVM/QEMU via libvirtd + virt-manager (virt.nix)
 # - Windows compatibility: Bottles, Wine Staging, Winetricks (via wincompat)
+# - Intiface Central: Buttplug.io device server (intiface.nix)
 # - SOPS secrets (age via SSH host key), home-manager (global pkgs, backup on collision)
 # - Fonts: FiraCode Nerd Font; locale: en_US.UTF-8 / America/New_York
 # - Nix: experimental features (nix-command, flakes), nixPath pinned to system nixpkgs (nix-shell -p); Zsh system shell
@@ -14,6 +15,7 @@
     ./packages.nix
     ./quarto.nix
     ./virt.nix
+    ./intiface.nix
     ./wake_on_lan.nix
     ./controllers.nix
     ./wincompat.nix
