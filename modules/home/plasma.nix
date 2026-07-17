@@ -1,5 +1,5 @@
 # Features:
-# - KDE Plasma home-manager config: plasma theme/wallpaper, WezTerm, Zsh, Baloo disabled, vkQuake entry
+# - KDE Plasma home-manager config: plasma theme/wallpaper, WezTerm terminal, Zsh, Baloo disabled, vkQuake entry
 let
   inherit (import ./common.nix)
     homeImports
@@ -10,6 +10,7 @@ let
 in
 { config, ... }: {
   imports = homeImports;
+  home.sessionVariables.TERMINAL = "wezterm";
   programs = {
     plasma = {
       enable = true;
