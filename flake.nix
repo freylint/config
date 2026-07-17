@@ -125,10 +125,12 @@
       batpcPackages = with pkgs; [ prismlauncher ];
 
       batpcPackageOverlays = [
-        (final: prev:
+        (
+          final: prev:
           let
             inherit (prev) symlinkJoin makeWrapper;
-            wrapGame = drv: bin:
+            wrapGame =
+              drv: bin:
               symlinkJoin {
                 inherit (drv) name;
                 paths = [ drv ];
@@ -234,7 +236,15 @@
         ];
       };
 
-      checks.${system} = import ./modules/tests { inherit pkgs nixpkgs system home-manager nix-vscode-extensions; };
+      checks.${system} = import ./modules/tests {
+        inherit
+          pkgs
+          nixpkgs
+          system
+          home-manager
+          nix-vscode-extensions
+          ;
+      };
 
       formatter.${system} = pkgs.nixfmt-tree;
 
@@ -254,7 +264,10 @@
             # overrides at runtime), so a tmpfs root satisfies the check without effect.
             {
               boot.loader.grub.enable = false;
-              fileSystems."/" = { device = "none"; fsType = "tmpfs"; };
+              fileSystems."/" = {
+                device = "none";
+                fsType = "tmpfs";
+              };
             }
           ];
         };
@@ -291,12 +304,17 @@
                     enable32Bit = true;
                   };
                 };
-                environment.systemPackages = [ pkgs.moonlight-qt pkgs.polychromatic ];
+                environment.systemPackages = [
+                  pkgs.moonlight-qt
+                  pkgs.polychromatic
+                ];
                 nixpkgs.overlays = [
-                  (final: prev:
+                  (
+                    final: prev:
                     let
                       inherit (prev) symlinkJoin makeWrapper;
-                      wrapGame = drv: bin:
+                      wrapGame =
+                        drv: bin:
                         symlinkJoin {
                           inherit (drv) name;
                           paths = [ drv ];
