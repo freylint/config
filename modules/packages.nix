@@ -51,6 +51,7 @@ in
     signal-desktop
     proton-vpn
     qbittorrent
+    vlc
     heroic
     vkquake
     runelite
