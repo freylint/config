@@ -10,6 +10,6 @@
   ];
   hardware.graphics.enable32Bit = true;
   home-manager.sharedModules = [
-    { xdg.dataFile."bottles/runners/GE-Proton".source = pkgs.proton-ge-bin; }
+    { xdg.dataFile."bottles/runners/GE-Proton".source = pkgs.proton-ge-bin.steamcompattool; }
   ];
 }
