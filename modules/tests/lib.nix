@@ -23,6 +23,7 @@ in
     modules:
     (nixpkgs.lib.nixosSystem {
       modules = [
+        home-manager.nixosModules.home-manager
         {
           nixpkgs.hostPlatform = system;
           system.stateVersion = "26.05";

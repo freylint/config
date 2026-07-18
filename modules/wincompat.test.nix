@@ -42,6 +42,7 @@ in
     name = "wincompat-runtime";
     nodes.machine = { ... }: {
       imports = [
+        home-manager.nixosModules.home-manager
         ./wincompat.nix
         vmBase
       ];
